@@ -3,7 +3,7 @@
 #include "Config.h"
 #include "Offer.h"
 #include "Protocol.h"
-#include "UdpTransport.h"
+#include "NetworkTransport.h"
 
 namespace TradeTogether::Trade
 {
@@ -90,7 +90,7 @@ namespace TradeTogether::Trade
 
         std::string GetLocalPlayerName()
         {
-            return UdpTransport::GetSingleton().GetLocalPlayerName();
+            return NetworkTransport::GetSingleton().GetLocalPlayerName();
         }
 
         std::string MakeRequestID()
@@ -238,7 +238,7 @@ namespace TradeTogether::Trade
                 a_payload,
                 state.session->requestID,
                 Protocol::HexEncode(state.session->peerName));
-            const auto sent = UdpTransport::GetSingleton().SendTo(
+            const auto sent = NetworkTransport::GetSingleton().SendTo(
                 state.session->peerName,
                 packet);
             if (sent) {
@@ -668,7 +668,7 @@ namespace TradeTogether::Trade
                 a_requestID,
                 Protocol::HexEncode(a_requester),
                 a_accepted ? 1 : 0);
-            return UdpTransport::GetSingleton().SendTo(a_requester, payload);
+            return NetworkTransport::GetSingleton().SendTo(a_requester, payload);
         }
 
         void RespondToRequest(
@@ -839,7 +839,7 @@ namespace TradeTogether::Trade
         {
             auto& state = GetState();
             if (!state.initialized ||
-                !UdpTransport::GetSingleton().IsRunning()) {
+                !NetworkTransport::GetSingleton().IsRunning()) {
                 Notify("TradeTogether: confirmation reseau indisponible.");
                 return false;
             }
@@ -876,7 +876,7 @@ namespace TradeTogether::Trade
                 displayName,
                 std::chrono::steady_clock::now()
             };
-            if (!UdpTransport::GetSingleton().SendTo(displayName, payload)) {
+            if (!NetworkTransport::GetSingleton().SendTo(displayName, payload)) {
                 state.pending.reset();
                 Notify("TradeTogether: impossible d'envoyer la demande.");
                 return false;
@@ -902,7 +902,7 @@ namespace TradeTogether::Trade
         }
 
         state.config = Config::Load();
-        state.initialized = UdpTransport::GetSingleton().Start(
+        state.initialized = NetworkTransport::GetSingleton().Start(
             state.config,
             [](std::string a_packet) {
                 if (auto* tasks = SKSE::GetTaskInterface()) {
@@ -920,7 +920,7 @@ namespace TradeTogether::Trade
 
     void Shutdown()
     {
-        UdpTransport::GetSingleton().Stop();
+        NetworkTransport::GetSingleton().Stop();
         auto& state = GetState();
         state.pending.reset();
         state.session.reset();

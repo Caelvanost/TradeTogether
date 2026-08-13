@@ -1,21 +1,28 @@
-# TradeTogether v0.7.1
+# TradeTogether v0.8.0-str-plugin branch
 
 Interface d'echange a offres synchronisees pour Skyrim Together Reborn.
 
 ## Installation Vortex
 
-L'archive Vortex utilise un FOMOD avec deux profils :
+L'archive Vortex utilise un FOMOD avec deux profils. Sur cette branche, les
+deux profils utilisent `Transport=STRPlugin`, donc TradeTogether ne demande
+plus d'ouverture de port quand `STRPluginMessagingAPI.dll` fournit un vrai
+pont via la connexion Skyrim Together Reborn.
 
 - **Client / Local** : choix recommande pour les clients distants, le LAN, ou
-  une installation sans relais Internet. Ce profil garde la decouverte LAN et
-  l'auto-detection de l'hote STR.
-- **Host** : choix a installer uniquement sur la machine qui heberge ou relaie
-  la session Internet. Ce profil active `RelayMode=1` et desactive
-  `AutoRemoteFromSTR`, car l'hote ne doit pas se cibler lui-meme via son
-  historique STR.
+  une installation sans relais Internet.
+- **Host** : profil reserve a la machine hote si on doit garder une difference
+  de role plus tard. En mode STRPlugin pur, il n'a plus besoin de redirection
+  de port.
 
-Pour jouer a distance, installez **Host** sur la machine qui recoit la
-redirection UDP 27993, et **Client / Local** sur les autres joueurs.
+Pour jouer a distance sans ouverture de port, installez aussi
+`STRPluginMessagingAPI.dll` et choisissez **Client / Local** sur les clients.
+Le canal utilise est `chaos.trade_together.offer.v1`.
+
+Si le plugin STR n'est pas installe ou pas encore connecte, `Transport=STRPlugin`
+refuse de demarrer le reseau TradeTogether au lieu de retomber silencieusement
+sur l'UDP. Pour tester l'ancien comportement, mettez `Transport=Auto` ou
+`Transport=UDP`.
 
 ## Deroulement d'un echange
 
@@ -45,12 +52,30 @@ Les objets de quete sont refuses. Une offre accepte jusqu'a 24 lignes et peut
 etre vide afin d'autoriser un don a sens unique. La demande initiale expire
 apres 30 secondes et une session inactive apres 5 minutes.
 
-## Connexion distante automatique avec STR
+## Transport STR Plugin Messaging
 
-TradeTogether utilise toujours son propre canal UDP sur le port **27993**. Il
+Cette branche commence la migration demandee vers le plugin
+`STRPluginMessagingAPI` commence dans ce workspace. TradeTogether :
+
+- charge `STRPluginMessagingAPI.dll` ;
+- enregistre le canal `chaos.trade_together.offer.v1` ;
+- envoie les payloads d'echange en reliable/ordered ;
+- garde le format actuel `TTNET|v1|...` pour limiter le risque de regression ;
+- ne cree aucun socket UDP quand `Transport=STRPlugin`.
+
+Limite importante : le depot STRPluginMessagingAPI indique encore que son shim
+actuel expose l'ABI mais retourne `kNotConnected` tant que le vrai pont reseau
+STR n'est pas implemente. Cette branche prepare donc TradeTogether cote client,
+mais le "zero port" complet depend de la suite dans le plugin STR.
+
+## Connexion distante automatique avec STR via UDP legacy
+
+Le transport UDP historique reste disponible avec `Transport=UDP` ou
+`Transport=Auto`. Dans ce mode, TradeTogether utilise son propre canal UDP sur
+le port **27993**. Il
 ne parle pas dans le port STR et ne modifie pas le protocole STR.
 
-La version 0.7.1 reprend la methode de MorphSyncTogether : quand un client STR
+La version 0.7.1 reprenait la methode de MorphSyncTogether : quand un client STR
 s'est connecte en direct a un serveur, STR garde la derniere adresse utilisee
 dans son stockage Chromium :
 
@@ -88,7 +113,7 @@ TradeTogether recupere automatiquement l'hote STR au lancement ou pendant les
 essais periodiques suivants. Si STR n'a encore rien enregistre, `RemotePeers`
 reste disponible comme solution manuelle.
 
-## Configuration Internet recommandee : un relais
+## Configuration Internet legacy UDP : un relais
 
 Choisissez la machine qui heberge la session Skyrim Together, ou celle qui a le
 plus facilement acces au routeur. Ouvrez/redirigez le port **UDP 27993** vers
@@ -98,6 +123,7 @@ Machine relais :
 
 ```ini
 [Network]
+Transport=UDP
 Disabled=0
 AutoDiscovery=0
 RelayMode=1
@@ -109,14 +135,15 @@ RemotePeers=
 SharedSecret=remplacez-par-la-meme-valeur-privee-partout
 ```
 
-Le FOMOD installe automatiquement ce profil si vous choisissez **Host**. Le
-fichier `TradeTogether_RelayHost.ini` reste fourni dans le depot comme modele
-manuel si vous preferez utiliser l'override separe.
+Le FOMOD legacy installait automatiquement ce profil si vous choisissiez
+**Host**. Le fichier `TradeTogether_RelayHost.ini` reste fourni dans le depot
+comme modele manuel si vous preferez utiliser l'override separe.
 
 Chaque client distant peut rester en configuration automatique :
 
 ```ini
 [Network]
+Transport=UDP
 Disabled=0
 AutoDiscovery=1
 RelayMode=0
@@ -194,5 +221,5 @@ Le journal se trouve dans
 Le script compile la DLL, prepare les profils FOMOD Host / Client Local et cree :
 
 ```text
-dist/TradeTogether-v0.7.1-Vortex.zip
+dist/TradeTogether-v0.8.0-str-plugin-Vortex.zip
 ```

@@ -4,6 +4,13 @@ namespace TradeTogether
 {
     struct Config
     {
+        enum class TransportMode
+        {
+            kAuto,
+            kSTRPlugin,
+            kUDP
+        };
+
         struct RemotePeer
         {
             std::string host;
@@ -11,6 +18,7 @@ namespace TradeTogether
         };
 
         bool networkEnabled{ true };
+        TransportMode transportMode{ TransportMode::kSTRPlugin };
         bool autoDiscovery{ true };
         bool relayMode{ false };
         bool autoRemoteFromSTR{ true };

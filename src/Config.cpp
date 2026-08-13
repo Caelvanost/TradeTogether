@@ -114,6 +114,45 @@ namespace TradeTogether
                 static_cast<std::uint16_t>(value) : a_fallback;
         }
 
+        std::optional<Config::TransportMode> ParseTransportMode(
+            std::string a_value)
+        {
+            a_value = Trim(std::move(a_value));
+            std::transform(
+                a_value.begin(),
+                a_value.end(),
+                a_value.begin(),
+                [](unsigned char a_character) {
+                    return static_cast<char>(std::tolower(a_character));
+                });
+
+            a_value.erase(
+                std::remove_if(
+                    a_value.begin(),
+                    a_value.end(),
+                    [](unsigned char a_character) {
+                        return a_character == '-' ||
+                               a_character == '_' ||
+                               std::isspace(a_character) != 0;
+                    }),
+                a_value.end());
+
+            if (a_value == "auto") {
+                return Config::TransportMode::kAuto;
+            }
+            if (a_value == "str" ||
+                a_value == "strplugin" ||
+                a_value == "strpm" ||
+                a_value == "skyrimtogether") {
+                return Config::TransportMode::kSTRPlugin;
+            }
+            if (a_value == "udp" ||
+                a_value == "legacyudp") {
+                return Config::TransportMode::kUDP;
+            }
+            return std::nullopt;
+        }
+
         std::optional<Config::RemotePeer> ParseRemotePeer(
             std::string a_value,
             std::uint16_t a_defaultPort)
@@ -203,6 +242,13 @@ namespace TradeTogether
 
         config.networkEnabled =
             !ReadBool(L"Network", L"Disabled", false);
+        if (const auto transportMode = ParseTransportMode(
+                ReadString(L"Network", L"Transport", L"STRPlugin"))) {
+            config.transportMode = *transportMode;
+        } else {
+            spdlog::warn(
+                "TradeTogether ignored invalid Network/Transport value");
+        }
         config.autoDiscovery =
             ReadBool(L"Network", L"AutoDiscovery", config.autoDiscovery);
         config.relayMode =
@@ -245,6 +291,14 @@ namespace TradeTogether
             ReadString(L"Network", L"SharedSecret", L"");
 
         if (GetFileAttributesW(kRelayHostIniPath) != INVALID_FILE_ATTRIBUTES) {
+            if (const auto transportMode = ParseTransportMode(
+                    ReadString(
+                        L"Network",
+                        L"Transport",
+                        L"",
+                        kRelayHostIniPath))) {
+                config.transportMode = *transportMode;
+            }
             config.autoDiscovery = ReadBool(
                 L"Network",
                 L"AutoDiscovery",

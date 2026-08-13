@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(TradeTogether VERSION 0.7.1 LANGUAGES CXX)
+project(TradeTogether VERSION 0.8.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,12 +15,18 @@ set(PROJECT_SOURCES
     src/Config.cpp
     src/Input.h
     src/Input.cpp
+    src/NetworkTransport.h
+    src/NetworkTransport.cpp
     src/Offer.h
     src/Offer.cpp
     src/Protocol.h
     src/Protocol.cpp
+    src/STRPluginMessagingAPI/STRPluginMessagingAPI.h
+    src/STRPluginMessagingAPI.cpp
     src/StrServerDiscovery.h
     src/StrServerDiscovery.cpp
+    src/StrMessagingTransport.h
+    src/StrMessagingTransport.cpp
     src/Trade.h
     src/Trade.cpp
     src/UdpTransport.h
