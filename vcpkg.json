@@ -1,6 +1,6 @@
 {
     "name":  "tradetogether",
-    "version-string":  "0.8.0-str-plugin",
+    "version-string":  "0.8.1-strpm5",
     "dependencies":  [
                          "commonlibsse-ng"
                      ],

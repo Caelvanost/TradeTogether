@@ -2,6 +2,6 @@
 <fomod>
   <Name>TradeTogether</Name>
   <Author>Caelvanost</Author>
-  <Version>0.8.0-str-plugin</Version>
-  <Description>Two-player trade offer interface for Skyrim Together Reborn. This branch starts the no-port STRPluginMessagingAPI transport path.</Description>
+  <Version>0.8.1-strpm5</Version>
+  <Description>Two-player trade offer interface for Skyrim Together Reborn. This branch uses the newer STRPM diagnostics-aware no-port transport path.</Description>
 </fomod>

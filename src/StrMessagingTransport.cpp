@@ -27,6 +27,33 @@ namespace TradeTogether
             return a_message.channel &&
                    std::strcmp(a_message.channel, kChannel) == 0;
         }
+
+        std::string_view BackendName(STRPM::RuntimeBackend a_backend)
+        {
+            switch (a_backend) {
+            case STRPM::RuntimeBackend::kUdp:
+                return "UDP";
+            case STRPM::RuntimeBackend::kStrBridge:
+                return "STRBridge";
+            case STRPM::RuntimeBackend::kNone:
+            default:
+                return "None";
+            }
+        }
+
+        std::string_view BackendModeName(
+            STRPM::RuntimeBackendMode a_backendMode)
+        {
+            switch (a_backendMode) {
+            case STRPM::RuntimeBackendMode::kUdp:
+                return "UDP";
+            case STRPM::RuntimeBackendMode::kStrBridge:
+                return "STRBridge";
+            case STRPM::RuntimeBackendMode::kAuto:
+            default:
+                return "Auto";
+            }
+        }
     }
 
     StrMessagingTransport& StrMessagingTransport::GetSingleton()
@@ -74,6 +101,11 @@ namespace TradeTogether
                 "TradeTogether STR Plugin Messaging API unavailable");
             return false;
         }
+        _diagnostics = STRPM::LoadDiagnosticsFromModule();
+        if (!_diagnostics) {
+            spdlog::warn(
+                "TradeTogether STRPM diagnostics unavailable; install the newer STRPluginMessagingAPI build for backend status logs");
+        }
 
         {
             std::scoped_lock lock(_handlerMutex);
@@ -92,15 +124,7 @@ namespace TradeTogether
         }
 
         _localConnectionID = 0;
-        if (_api->getLocalConnectionID) {
-            const auto result =
-                _api->getLocalConnectionID(&_localConnectionID);
-            if (result != STRPM::Result::kOk) {
-                spdlog::info(
-                    "TradeTogether STRPM local connection id unavailable yet: {}",
-                    STRPM::ResultToString(result));
-            }
-        }
+        RefreshLocalConnectionID();
 
         STRPM::ListenerHandle listener{};
         const auto result = _api->registerChannel(
@@ -111,9 +135,22 @@ namespace TradeTogether
         if (result != STRPM::Result::kOk) {
             std::scoped_lock lock(_handlerMutex);
             _handler = {};
+            _api = nullptr;
+            _diagnostics = nullptr;
             spdlog::warn(
                 "TradeTogether STRPM registerChannel failed: {}",
                 STRPM::ResultToString(result));
+            return false;
+        }
+
+        if (IsUdpBackendActive()) {
+            _api->unregisterChannel(listener);
+            std::scoped_lock lock(_handlerMutex);
+            _handler = {};
+            _api = nullptr;
+            _diagnostics = nullptr;
+            spdlog::error(
+                "TradeTogether refused STRPM because its active backend is UDP; use the STR bridge build or set TradeTogether Transport=UDP explicitly");
             return false;
         }
 
@@ -124,6 +161,7 @@ namespace TradeTogether
             kChannel,
             localName,
             _localConnectionID);
+        LogRuntimeStatus("startup");
         return true;
     }
 
@@ -150,6 +188,7 @@ namespace TradeTogether
         _listener = {};
         _localConnectionID = 0;
         _api = nullptr;
+        _diagnostics = nullptr;
         spdlog::info("TradeTogether STRPM transport stopped");
     }
 
@@ -164,6 +203,12 @@ namespace TradeTogether
             a_payload.empty()) {
             return false;
         }
+        if (IsUdpBackendActive()) {
+            spdlog::error(
+                "TradeTogether STRPM send refused because STRPM is using its UDP backend");
+            return false;
+        }
+        RefreshLocalConnectionID();
 
         const auto packet = fmt::format(
             "TTNET|v1|id={}|from={}|relay=0|{}",
@@ -219,6 +264,7 @@ namespace TradeTogether
                 "TradeTogether STRPM send failed target=\"{}\" result={}",
                 a_playerName,
                 STRPM::ResultToString(result));
+            LogRuntimeStatus("send failure");
             return false;
         }
 
@@ -227,6 +273,70 @@ namespace TradeTogether
             a_playerName,
             packet.size());
         return true;
+    }
+
+    std::optional<STRPM::RuntimeStatus>
+        StrMessagingTransport::QueryRuntimeStatus() const
+    {
+        if (!_diagnostics || !_diagnostics->getRuntimeStatus) {
+            return std::nullopt;
+        }
+
+        STRPM::RuntimeStatus status{};
+        const auto result = _diagnostics->getRuntimeStatus(&status);
+        if (result != STRPM::Result::kOk ||
+            status.version != STRPM::kDiagnosticsVersion) {
+            return std::nullopt;
+        }
+        return status;
+    }
+
+    void StrMessagingTransport::LogRuntimeStatus(
+        std::string_view a_context) const
+    {
+        const auto status = QueryRuntimeStatus();
+        if (!status) {
+            return;
+        }
+
+        spdlog::info(
+            "TradeTogether STRPM status {}: backend={} mode={} bridgeAvailable={} bridgeActive={} knownPeers={} configuredPeers={} localPort={} relay={}",
+            a_context,
+            BackendName(status->activeBackend),
+            BackendModeName(status->configuredBackendMode),
+            status->strBridgeAvailable,
+            status->strBridgeActive,
+            status->knownPeerCount,
+            status->configuredPeerCount,
+            status->localPort,
+            status->relayMode);
+    }
+
+    bool StrMessagingTransport::IsUdpBackendActive() const
+    {
+        const auto status = QueryRuntimeStatus();
+        return status &&
+               status->activeBackend == STRPM::RuntimeBackend::kUdp;
+    }
+
+    void StrMessagingTransport::RefreshLocalConnectionID()
+    {
+        if (!_api || !_api->getLocalConnectionID) {
+            return;
+        }
+
+        STRPM::ConnectionID connectionID = 0;
+        const auto result = _api->getLocalConnectionID(&connectionID);
+        if (result == STRPM::Result::kOk && connectionID != 0) {
+            _localConnectionID = connectionID;
+            return;
+        }
+
+        if (_localConnectionID == 0) {
+            spdlog::info(
+                "TradeTogether STRPM local connection id unavailable yet: {}",
+                STRPM::ResultToString(result));
+        }
     }
 
     void StrMessagingTransport::HandleMessage(const STRPM::Message* a_message)

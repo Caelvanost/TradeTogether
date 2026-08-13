@@ -30,12 +30,17 @@ namespace TradeTogether
         StrMessagingTransport& operator=(const StrMessagingTransport&) = delete;
 
         void HandleMessage(const STRPM::Message* a_message);
+        std::optional<STRPM::RuntimeStatus> QueryRuntimeStatus() const;
+        void LogRuntimeStatus(std::string_view a_context) const;
+        bool IsUdpBackendActive() const;
+        void RefreshLocalConnectionID();
 
         static void STRPM_CALL OnMessage(
             const STRPM::Message* a_message,
             void* a_userData);
 
         const STRPM::Interface* _api{ nullptr };
+        const STRPM::DiagnosticsInterface* _diagnostics{ nullptr };
         STRPM::ListenerHandle _listener{};
         STRPM::ConnectionID _localConnectionID{ 0 };
         PacketHandler _handler;

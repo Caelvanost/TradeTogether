@@ -1,6 +1,6 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.8.0-str-plugin"
+    [string]$Version = "0.8.1-strpm5"
 )
 
 $ErrorActionPreference = "Stop"
@@ -44,13 +44,15 @@ foreach ($requiredPath in @($clientIniPath, $hostIniPath, $moduleConfigPath, $in
 
 $clientIniContent = Get-Content -LiteralPath $clientIniPath -Raw
 $hostIniContent = Get-Content -LiteralPath $hostIniPath -Raw
-if ($clientIniContent -notmatch '(?ms)^\[Network\].*?^RelayMode=0\s*$' -or
+if ($clientIniContent -notmatch '(?ms)^\[Network\].*?^Transport=STRPlugin\s*$' -or
+    $clientIniContent -notmatch '(?ms)^\[Network\].*?^RelayMode=0\s*$' -or
     $clientIniContent -notmatch '(?ms)^\[Network\].*?^AutoRemoteFromSTR=1\s*$') {
-    throw "Le profil Client / Local doit garder RelayMode=0 et AutoRemoteFromSTR=1."
+    throw "Le profil Client / Local doit garder Transport=STRPlugin, RelayMode=0 et AutoRemoteFromSTR=1."
 }
-if ($hostIniContent -notmatch '(?ms)^\[Network\].*?^RelayMode=1\s*$' -or
+if ($hostIniContent -notmatch '(?ms)^\[Network\].*?^Transport=STRPlugin\s*$' -or
+    $hostIniContent -notmatch '(?ms)^\[Network\].*?^RelayMode=1\s*$' -or
     $hostIniContent -notmatch '(?ms)^\[Network\].*?^AutoRemoteFromSTR=0\s*$') {
-    throw "Le profil Host doit activer RelayMode=1 et desactiver AutoRemoteFromSTR."
+    throw "Le profil Host doit garder Transport=STRPlugin, activer RelayMode=1 et desactiver AutoRemoteFromSTR."
 }
 
 try {

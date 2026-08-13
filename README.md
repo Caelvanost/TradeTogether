@@ -1,4 +1,4 @@
-# TradeTogether v0.8.0-str-plugin branch
+# TradeTogether v0.8.1-strpm5 branch
 
 Interface d'echange a offres synchronisees pour Skyrim Together Reborn.
 
@@ -19,10 +19,12 @@ Pour jouer a distance sans ouverture de port, installez aussi
 `STRPluginMessagingAPI.dll` et choisissez **Client / Local** sur les clients.
 Le canal utilise est `chaos.trade_together.offer.v1`.
 
-Si le plugin STR n'est pas installe ou pas encore connecte, `Transport=STRPlugin`
-refuse de demarrer le reseau TradeTogether au lieu de retomber silencieusement
-sur l'UDP. Pour tester l'ancien comportement, mettez `Transport=Auto` ou
-`Transport=UDP`.
+Si le plugin STRPM n'est pas installe, `Transport=STRPlugin` refuse de demarrer
+le reseau TradeTogether au lieu de retomber silencieusement sur l'UDP. Si STRPM
+est installe mais que son bridge STR n'est pas encore actif, l'interface peut
+s'enregistrer et les envois retourneront `not connected` avec un statut
+diagnostic dans `TradeTogether.log`. Pour tester l'ancien comportement, mettez
+`Transport=Auto` ou `Transport=UDP`.
 
 ## Deroulement d'un echange
 
@@ -54,19 +56,25 @@ apres 30 secondes et une session inactive apres 5 minutes.
 
 ## Transport STR Plugin Messaging
 
-Cette branche commence la migration demandee vers le plugin
-`STRPluginMessagingAPI` commence dans ce workspace. TradeTogether :
+Cette branche suit le nouveau STRPM v5 du workspace. TradeTogether :
 
 - charge `STRPluginMessagingAPI.dll` ;
 - enregistre le canal `chaos.trade_together.offer.v1` ;
 - envoie les payloads d'echange en reliable/ordered ;
 - garde le format actuel `TTNET|v1|...` pour limiter le risque de regression ;
-- ne cree aucun socket UDP quand `Transport=STRPlugin`.
+- lit les diagnostics STRPM v2 (`RuntimeStatus`) ;
+- refuse un STRPM qui serait actif sur son backend UDP de developpement ;
+- ne cree aucun socket UDP TradeTogether quand `Transport=STRPlugin`.
 
-Limite importante : le depot STRPluginMessagingAPI indique encore que son shim
-actuel expose l'ABI mais retourne `kNotConnected` tant que le vrai pont reseau
-STR n'est pas implemente. Cette branche prepare donc TradeTogether cote client,
-mais le "zero port" complet depend de la suite dans le plugin STR.
+Le nouveau runtime STRPM est pense en deux couches :
+
+- `STR_QueryPluginMessagingInterface` pour les mods SKSE comme TradeTogether ;
+- `STRPM_QueryTransportInterface` pour le bridge prive cote STR.
+
+Le build STRPM package par defaut n'ouvre pas d'UDP. Si le bridge
+`Data\SkyrimTogetherReborn\STRPluginMessagingBridge.dll` manque ou ne demarre
+pas encore, STRPM garde le backend actif a `None` et les envois peuvent
+retourner `not connected`.
 
 ## Connexion distante automatique avec STR via UDP legacy
 
@@ -221,5 +229,5 @@ Le journal se trouve dans
 Le script compile la DLL, prepare les profils FOMOD Host / Client Local et cree :
 
 ```text
-dist/TradeTogether-v0.8.0-str-plugin-Vortex.zip
+dist/TradeTogether-v0.8.1-strpm5-Vortex.zip
 ```
