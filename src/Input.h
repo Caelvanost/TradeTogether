@@ -13,9 +13,7 @@ namespace TradeTogether
             RE::BSTEventSource<RE::InputEvent*>* a_eventSource) override;
 
     private:
-        static constexpr std::uint32_t kF6ScanCode = 0x40;
-        static constexpr std::uint32_t kEScanCode = 0x12;
-        static constexpr std::uint32_t kTabScanCode = 0x0F;
-        static constexpr std::uint32_t kDeleteScanCode = 0xD3;
+        // DirectInput keyboard scan code for T.
+        static constexpr std::uint32_t kTScanCode = 0x14;
     };
 }
