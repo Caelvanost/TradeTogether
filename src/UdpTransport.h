@@ -73,6 +73,9 @@ namespace TradeTogether
             std::string_view a_operation);
         std::optional<sockaddr_in> ResolveRemotePeer(
             const Config::RemotePeer& a_peer) const;
+        void RefreshSkyrimTogetherAutoConfig(bool a_force);
+        std::vector<sockaddr_in> SnapshotConfiguredPeers() const;
+        std::string GetSharedSecretSnapshot() const;
         std::string SignPacket(std::string a_packet) const;
         bool AuthenticatePacket(std::string_view a_packet) const;
         static std::string RemoveAuthField(std::string_view a_packet);
@@ -85,6 +88,10 @@ namespace TradeTogether
         SOCKET _socket{ INVALID_SOCKET };
         sockaddr_in _broadcast{};
         std::vector<sockaddr_in> _configuredPeers;
+        mutable std::mutex _configuredPeerMutex;
+        mutable std::mutex _authMutex;
+        std::string _sharedSecret;
+        std::chrono::steady_clock::time_point _lastStrAutoConfigRefresh{};
         std::string _instanceID;
 
         std::jthread _receiver;

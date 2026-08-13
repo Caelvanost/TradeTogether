@@ -7,35 +7,41 @@ namespace TradeTogether
     {
         constexpr wchar_t kIniPath[] =
             L".\\Data\\SKSE\\Plugins\\TradeTogether.ini";
+        constexpr wchar_t kRelayHostIniPath[] =
+            L".\\Data\\SKSE\\Plugins\\TradeTogether_RelayHost.ini";
 
         std::uint32_t ReadUInt(
             const wchar_t* a_section,
             const wchar_t* a_key,
-            std::uint32_t a_fallback)
+            std::uint32_t a_fallback,
+            const wchar_t* a_path = kIniPath)
         {
             return static_cast<std::uint32_t>(
                 GetPrivateProfileIntW(
                     a_section,
                     a_key,
                     static_cast<int>(a_fallback),
-                    kIniPath));
+                    a_path));
         }
 
         bool ReadBool(
             const wchar_t* a_section,
             const wchar_t* a_key,
-            bool a_fallback)
+            bool a_fallback,
+            const wchar_t* a_path = kIniPath)
         {
             return ReadUInt(
                        a_section,
                        a_key,
-                       a_fallback ? 1U : 0U) != 0;
+                       a_fallback ? 1U : 0U,
+                       a_path) != 0;
         }
 
         std::string ReadString(
             const wchar_t* a_section,
             const wchar_t* a_key,
-            const wchar_t* a_fallback)
+            const wchar_t* a_fallback,
+            const wchar_t* a_path = kIniPath)
         {
             std::array<wchar_t, 2048> buffer{};
             GetPrivateProfileStringW(
@@ -44,7 +50,7 @@ namespace TradeTogether
                 a_fallback,
                 buffer.data(),
                 static_cast<DWORD>(buffer.size()),
-                kIniPath);
+                a_path);
 
             const auto required = WideCharToMultiByte(
                 CP_UTF8,
@@ -96,12 +102,14 @@ namespace TradeTogether
 
         std::uint16_t ReadPort(
             const wchar_t* a_key,
-            std::uint16_t a_fallback)
+            std::uint16_t a_fallback,
+            const wchar_t* a_path = kIniPath)
         {
             const auto value = ReadUInt(
                 L"Network",
                 a_key,
-                a_fallback);
+                a_fallback,
+                a_path);
             return value > 0 && value <= 65535 ?
                 static_cast<std::uint16_t>(value) : a_fallback;
         }
@@ -201,6 +209,17 @@ namespace TradeTogether
             ReadBool(L"Network", L"RelayMode", config.relayMode);
         config.localPort =
             ReadPort(L"LocalPort", config.localPort);
+        config.autoRemotePort = config.localPort;
+        config.autoRemoteFromSTR = ReadBool(
+            L"Network",
+            L"AutoRemoteFromSTR",
+            config.autoRemoteFromSTR);
+        config.autoSharedSecretFromSTR = ReadBool(
+            L"Network",
+            L"AutoSharedSecretFromSTR",
+            config.autoSharedSecretFromSTR);
+        config.autoRemotePort =
+            ReadPort(L"AutoRemotePort", config.autoRemotePort);
         config.peerPort =
             ReadPort(L"PeerPort", config.localPort);
         config.peerHost =
@@ -224,6 +243,44 @@ namespace TradeTogether
         }
         config.sharedSecret =
             ReadString(L"Network", L"SharedSecret", L"");
+
+        if (GetFileAttributesW(kRelayHostIniPath) != INVALID_FILE_ATTRIBUTES) {
+            config.autoDiscovery = ReadBool(
+                L"Network",
+                L"AutoDiscovery",
+                config.autoDiscovery,
+                kRelayHostIniPath);
+            config.relayMode = ReadBool(
+                L"Network",
+                L"RelayMode",
+                config.relayMode,
+                kRelayHostIniPath);
+            config.autoRemoteFromSTR = ReadBool(
+                L"Network",
+                L"AutoRemoteFromSTR",
+                config.autoRemoteFromSTR,
+                kRelayHostIniPath);
+            config.autoSharedSecretFromSTR = ReadBool(
+                L"Network",
+                L"AutoSharedSecretFromSTR",
+                config.autoSharedSecretFromSTR,
+                kRelayHostIniPath);
+            config.localPort =
+                ReadPort(L"LocalPort", config.localPort, kRelayHostIniPath);
+            config.autoRemotePort = ReadPort(
+                L"AutoRemotePort",
+                config.autoRemotePort,
+                kRelayHostIniPath);
+
+            const auto relaySharedSecret = ReadString(
+                L"Network",
+                L"SharedSecret",
+                L"",
+                kRelayHostIniPath);
+            if (!relaySharedSecret.empty()) {
+                config.sharedSecret = relaySharedSecret;
+            }
+        }
         config.discoveryIntervalMs = std::clamp(
             ReadUInt(
                 L"Network",

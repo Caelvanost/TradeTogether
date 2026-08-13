@@ -1,4 +1,4 @@
-# TradeTogether v0.6.0
+# TradeTogether v0.7.0
 
 Interface d'echange a offres synchronisees pour Skyrim Together Reborn.
 
@@ -30,14 +30,48 @@ Les objets de quete sont refuses. Une offre accepte jusqu'a 24 lignes et peut
 etre vide afin d'autoriser un don a sens unique. La demande initiale expire
 apres 30 secondes et une session inactive apres 5 minutes.
 
-## Connexion distante
+## Connexion distante automatique avec STR
 
-TradeTogether utilise un canal UDP independant sur le port **27993**. La
-decouverte automatique fonctionne sur un reseau local, mais les broadcasts LAN
-ne traversent pas Internet.
+TradeTogether utilise toujours son propre canal UDP sur le port **27993**. Il
+ne parle pas dans le port STR et ne modifie pas le protocole STR.
 
-La version 0.6.0 reprend le principe de MorphSyncTogether : `RemotePeers`,
-`RelayMode` et `SharedSecret`.
+La version 0.7.0 reprend la methode de MorphSyncTogether : quand un client STR
+s'est connecte en direct a un serveur, STR garde la derniere adresse utilisee
+dans son stockage Chromium :
+
+```text
+Data\SkyrimTogetherReborn\cache\Default\Local Storage\leveldb
+```
+
+TradeTogether lit cette adresse, retire le port STR si elle en contient un,
+puis contacte le meme hote sur `AutoRemotePort`, par defaut **27993**.
+
+Exemple :
+
+```text
+STR direct connect : 82.65.51.103:10578
+TradeTogether      : 82.65.51.103:27993
+```
+
+Configuration client par defaut :
+
+```ini
+[Network]
+Disabled=0
+AutoDiscovery=1
+RelayMode=0
+LocalPort=27993
+AutoRemoteFromSTR=1
+AutoRemotePort=27993
+AutoSharedSecretFromSTR=0
+RemotePeers=
+SharedSecret=
+```
+
+En pratique, le client distant se connecte d'abord au serveur STR, puis
+TradeTogether recupere automatiquement l'hote STR au lancement ou pendant les
+essais periodiques suivants. Si STR n'a encore rien enregistre, `RemotePeers`
+reste disponible comme solution manuelle.
 
 ## Configuration Internet recommandee : un relais
 
@@ -53,23 +87,30 @@ Disabled=0
 AutoDiscovery=0
 RelayMode=1
 LocalPort=27993
+AutoRemoteFromSTR=0
+AutoRemotePort=27993
+AutoSharedSecretFromSTR=0
 RemotePeers=
 SharedSecret=remplacez-par-la-meme-valeur-privee-partout
 ```
 
-Chaque client distant :
+Un modele optionnel est fourni dans `TradeTogether_RelayHost.ini`. Copiez-le
+comme `Data\SKSE\Plugins\TradeTogether_RelayHost.ini` pour transformer cette
+installation en hote relais sans remplacer le fichier principal.
+
+Chaque client distant peut rester en configuration automatique :
 
 ```ini
 [Network]
 Disabled=0
-AutoDiscovery=0
+AutoDiscovery=1
 RelayMode=0
 LocalPort=27993
-RemotePeers=ip-publique-ou-dns-du-relais:27993
+AutoRemoteFromSTR=1
+AutoRemotePort=27993
+RemotePeers=
 SharedSecret=remplacez-par-la-meme-valeur-privee-partout
 ```
-
-Un exemple pret a adapter est fourni dans `TradeTogether_Player2.ini`.
 
 Les clients envoient des paquets de decouverte periodiques au relais. Cela
 ouvre leur route NAT sortante, donc ils n'ont normalement pas besoin de
@@ -77,9 +118,21 @@ redirection de port. Le relais apprend leur adresse publique observee et
 transmet les paquets d'echange aux autres pairs actifs. Les paquets relayes
 sont marques pour eviter les boucles.
 
+## Secret partage
+
 `SharedSecret` active une signature HMAC-SHA256 sur les paquets de decouverte
 et d'echange. La valeur doit etre identique chez tous les joueurs et n'est
 jamais transmise sur le reseau.
+
+Option avancee, comme MorphSyncTogether : si `AutoSharedSecretFromSTR=1` et
+que `SharedSecret` est vide, TradeTogether tente de reutiliser le mot de passe
+STR :
+
+- en mode relais, il lit `sPassword` dans
+  `Data\SkyrimTogetherReborn\config\STServer.ini` ;
+- en mode client, il lit le mot de passe direct-connect sauvegarde par STR.
+
+Si aucun mot de passe STR n'est trouve, utilisez `SharedSecret` manuellement.
 
 ## Pairs Internet directs
 
@@ -96,11 +149,10 @@ ajoute a `RemotePeers`.
 
 ## A propos du serveur STR
 
-Utiliser l'adresse du serveur Skyrim Together comme `RemotePeers` fonctionne
-si ce meme ordinateur execute aussi le relais TradeTogether et expose le port
-UDP 27993. Le protocole STR ne relaye pas automatiquement les paquets
-TradeTogether : le meme serveur peut etre reutilise comme machine, pas comme
-canal reseau interne.
+On peut reutiliser l'adresse de la machine STR, mais pas le port STR comme
+canal TradeTogether. Le serveur STR peut heberger le relais TradeTogether si le
+port UDP 27993 est expose, mais STR ne relaye pas automatiquement les paquets
+TradeTogether.
 
 ## Limite actuelle
 
@@ -127,5 +179,5 @@ Le journal se trouve dans
 Le script compile la DLL, la copie avec l'INI dans le paquet et cree :
 
 ```text
-dist/TradeTogether-v0.6.0-Vortex.zip
+dist/TradeTogether-v0.7.0-Vortex.zip
 ```

@@ -1,6 +1,7 @@
 #include "PCH.h"
 #include "UdpTransport.h"
 #include "Protocol.h"
+#include "StrServerDiscovery.h"
 
 #include <bcrypt.h>
 
@@ -182,11 +183,12 @@ namespace TradeTogether
     std::string UdpTransport::SignPacket(std::string a_packet) const
     {
         a_packet = RemoveAuthField(a_packet);
-        if (_config.sharedSecret.empty()) {
+        const auto sharedSecret = GetSharedSecretSnapshot();
+        if (sharedSecret.empty()) {
             return a_packet;
         }
 
-        const auto tag = ComputeHmacSha256(_config.sharedSecret, a_packet);
+        const auto tag = ComputeHmacSha256(sharedSecret, a_packet);
         if (!tag) {
             spdlog::error("TradeTogether HMAC generation failed");
             return {};
@@ -196,7 +198,8 @@ namespace TradeTogether
 
     bool UdpTransport::AuthenticatePacket(std::string_view a_packet) const
     {
-        if (_config.sharedSecret.empty()) {
+        const auto sharedSecret = GetSharedSecretSnapshot();
+        if (sharedSecret.empty()) {
             return true;
         }
 
@@ -213,7 +216,7 @@ namespace TradeTogether
                 std::string_view::npos : tagEnd - tagStart);
         const auto unsignedPacket = RemoveAuthField(a_packet);
         const auto expected =
-            ComputeHmacSha256(_config.sharedSecret, unsignedPacket);
+            ComputeHmacSha256(sharedSecret, unsignedPacket);
         if (!expected || supplied.size() != expected->size()) {
             return false;
         }
@@ -270,6 +273,108 @@ namespace TradeTogether
         return result;
     }
 
+    std::string UdpTransport::GetSharedSecretSnapshot() const
+    {
+        std::scoped_lock lock(_authMutex);
+        return _sharedSecret;
+    }
+
+    std::vector<sockaddr_in> UdpTransport::SnapshotConfiguredPeers() const
+    {
+        std::scoped_lock lock(_configuredPeerMutex);
+        return _configuredPeers;
+    }
+
+    void UdpTransport::RefreshSkyrimTogetherAutoConfig(bool a_force)
+    {
+        if (!_config.autoRemoteFromSTR &&
+            !_config.autoSharedSecretFromSTR) {
+            return;
+        }
+
+        const auto now = std::chrono::steady_clock::now();
+        if (!a_force &&
+            _lastStrAutoConfigRefresh.time_since_epoch().count() != 0 &&
+            now - _lastStrAutoConfigRefresh < std::chrono::seconds(5)) {
+            return;
+        }
+        _lastStrAutoConfigRefresh = now;
+
+        if (_config.autoSharedSecretFromSTR &&
+            _config.sharedSecret.empty()) {
+            const auto password = _config.relayMode ?
+                StrServerDiscovery::ReadServerPasswordFromConfig() :
+                StrServerDiscovery::ReadClientState(
+                    _config.autoRemotePort).password;
+
+            if (password && !password->empty()) {
+                bool changed = false;
+                {
+                    std::scoped_lock lock(_authMutex);
+                    if (_sharedSecret != *password) {
+                        _sharedSecret = *password;
+                        changed = true;
+                    }
+                }
+
+                if (changed) {
+                    spdlog::info(
+                        "TradeTogether STR shared secret auto-loaded source={}",
+                        _config.relayMode ? "STServer.ini" : "localStorage");
+                }
+            }
+        }
+
+        if (!_config.autoRemoteFromSTR ||
+            _config.relayMode) {
+            return;
+        }
+
+        const auto state =
+            StrServerDiscovery::ReadClientState(_config.autoRemotePort);
+        if (!state.remotePeer) {
+            if (a_force) {
+                spdlog::info(
+                    "TradeTogether STR auto remote pending: no saved direct-connect address found");
+            }
+            return;
+        }
+
+        const auto resolved = ResolveRemotePeer(*state.remotePeer);
+        if (!resolved) {
+            spdlog::warn(
+                "TradeTogether STR auto remote resolution failed address=\"{}\" host=\"{}\" port={}",
+                state.rawAddress,
+                state.remotePeer->host,
+                state.remotePeer->port);
+            return;
+        }
+
+        const auto endpoint = AddressToString(*resolved);
+        bool inserted = false;
+        {
+            std::scoped_lock lock(_configuredPeerMutex);
+            const auto duplicate = std::any_of(
+                _configuredPeers.begin(),
+                _configuredPeers.end(),
+                [&](const sockaddr_in& a_existing) {
+                    return SameEndpoint(a_existing, *resolved);
+                });
+
+            if (!duplicate) {
+                _configuredPeers.push_back(*resolved);
+                inserted = true;
+            }
+        }
+
+        if (inserted) {
+            spdlog::info(
+                "TradeTogether STR auto remote configured address=\"{}\" endpoint={}",
+                state.rawAddress,
+                endpoint);
+        }
+    }
+
     bool UdpTransport::SendPacketTo(
         std::string_view a_packet,
         const sockaddr_in& a_destination,
@@ -314,6 +419,11 @@ namespace TradeTogether
 
         _config = a_config;
         _handler = std::move(a_handler);
+        {
+            std::scoped_lock lock(_authMutex);
+            _sharedSecret = _config.sharedSecret;
+        }
+        _lastStrAutoConfigRefresh = {};
 
         WSADATA winsock{};
         if (const auto result = WSAStartup(MAKEWORD(2, 2), &winsock);
@@ -380,7 +490,7 @@ namespace TradeTogether
         _broadcast.sin_port = htons(_config.localPort);
         _broadcast.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 
-        _configuredPeers.clear();
+        std::vector<sockaddr_in> configuredPeers;
         std::unordered_set<std::string> configuredEndpoints;
         for (const auto& peer : _config.remotePeers) {
             const auto resolved = ResolveRemotePeer(peer);
@@ -394,26 +504,37 @@ namespace TradeTogether
 
             const auto endpoint = AddressToString(*resolved);
             if (configuredEndpoints.insert(endpoint).second) {
-                _configuredPeers.push_back(*resolved);
+                configuredPeers.push_back(*resolved);
                 spdlog::info(
                     "TradeTogether remote peer configured host=\"{}\" endpoint={}",
                     peer.host,
                     endpoint);
             }
         }
+        {
+            std::scoped_lock lock(_configuredPeerMutex);
+            _configuredPeers = std::move(configuredPeers);
+        }
 
         _instanceID = fmt::format(
             "{:08X}-{:016X}",
             GetCurrentProcessId(),
             GetTickCount64());
+
+        RefreshSkyrimTogetherAutoConfig(true);
+        const auto configuredPeerCount = SnapshotConfiguredPeers().size();
+        const auto sharedSecret = GetSharedSecretSnapshot();
+
         _running.store(true);
         _receiver = std::jthread(
             [this](std::stop_token) {
                 ReceiverLoop();
             });
         if (_config.autoDiscovery ||
-            !_configuredPeers.empty() ||
-            _config.relayMode) {
+            configuredPeerCount > 0 ||
+            _config.relayMode ||
+            _config.autoRemoteFromSTR ||
+            _config.autoSharedSecretFromSTR) {
             _maintenance = std::jthread(
                 [this](std::stop_token a_token) {
                     MaintenanceLoop(a_token);
@@ -426,11 +547,11 @@ namespace TradeTogether
             _config.localPort,
             _config.autoDiscovery ? 1 : 0,
             _config.relayMode ? 1 : 0,
-            _config.sharedSecret.empty() ? 0 : 1,
-            _configuredPeers.size(),
+            sharedSecret.empty() ? 0 : 1,
+            configuredPeerCount,
             _instanceID);
 
-        if (_config.relayMode && _config.sharedSecret.empty()) {
+        if (_config.relayMode && sharedSecret.empty()) {
             spdlog::warn(
                 "TradeTogether relay is unauthenticated; set Network/SharedSecret before exposing UDP port {} to the Internet",
                 _config.localPort);
@@ -467,7 +588,14 @@ namespace TradeTogether
             std::scoped_lock lock(_peerMutex);
             _peers.clear();
         }
-        _configuredPeers.clear();
+        {
+            std::scoped_lock lock(_configuredPeerMutex);
+            _configuredPeers.clear();
+        }
+        {
+            std::scoped_lock lock(_authMutex);
+            _sharedSecret.clear();
+        }
         _handler = {};
         WSACleanup();
         spdlog::info("Trade UDP stopped");
@@ -482,7 +610,7 @@ namespace TradeTogether
         if (_config.autoDiscovery) {
             SendHelloTo(_broadcast, false);
         }
-        for (const auto& peer : _configuredPeers) {
+        for (const auto& peer : SnapshotConfiguredPeers()) {
             SendHelloTo(peer, true);
         }
     }
@@ -628,7 +756,9 @@ namespace TradeTogether
         std::vector<sockaddr_in> result;
         std::unordered_set<std::string> endpoints;
 
-        for (const auto& peer : _configuredPeers) {
+        const auto configuredPeers = SnapshotConfiguredPeers();
+        result.reserve(configuredPeers.size());
+        for (const auto& peer : configuredPeers) {
             if (a_excluded && SameEndpoint(peer, *a_excluded)) {
                 continue;
             }
@@ -639,6 +769,7 @@ namespace TradeTogether
         }
 
         std::scoped_lock lock(_peerMutex);
+        result.reserve(result.size() + _peers.size());
         for (const auto& [key, peer] : _peers) {
             if (!a_playerName.empty() &&
                 !Protocol::EqualsInsensitive(peer.name, a_playerName)) {
@@ -741,6 +872,7 @@ namespace TradeTogether
     void UdpTransport::MaintenanceLoop(std::stop_token a_stopToken)
     {
         while (!a_stopToken.stop_requested() && _running.load()) {
+            RefreshSkyrimTogetherAutoConfig(false);
             SendHello();
             ExpirePeers();
 
