@@ -1,6 +1,21 @@
-# TradeTogether v0.7.0
+# TradeTogether v0.7.1
 
 Interface d'echange a offres synchronisees pour Skyrim Together Reborn.
+
+## Installation Vortex
+
+L'archive Vortex utilise un FOMOD avec deux profils :
+
+- **Client / Local** : choix recommande pour les clients distants, le LAN, ou
+  une installation sans relais Internet. Ce profil garde la decouverte LAN et
+  l'auto-detection de l'hote STR.
+- **Host** : choix a installer uniquement sur la machine qui heberge ou relaie
+  la session Internet. Ce profil active `RelayMode=1` et desactive
+  `AutoRemoteFromSTR`, car l'hote ne doit pas se cibler lui-meme via son
+  historique STR.
+
+Pour jouer a distance, installez **Host** sur la machine qui recoit la
+redirection UDP 27993, et **Client / Local** sur les autres joueurs.
 
 ## Deroulement d'un echange
 
@@ -35,7 +50,7 @@ apres 30 secondes et une session inactive apres 5 minutes.
 TradeTogether utilise toujours son propre canal UDP sur le port **27993**. Il
 ne parle pas dans le port STR et ne modifie pas le protocole STR.
 
-La version 0.7.0 reprend la methode de MorphSyncTogether : quand un client STR
+La version 0.7.1 reprend la methode de MorphSyncTogether : quand un client STR
 s'est connecte en direct a un serveur, STR garde la derniere adresse utilisee
 dans son stockage Chromium :
 
@@ -94,9 +109,9 @@ RemotePeers=
 SharedSecret=remplacez-par-la-meme-valeur-privee-partout
 ```
 
-Un modele optionnel est fourni dans `TradeTogether_RelayHost.ini`. Copiez-le
-comme `Data\SKSE\Plugins\TradeTogether_RelayHost.ini` pour transformer cette
-installation en hote relais sans remplacer le fichier principal.
+Le FOMOD installe automatiquement ce profil si vous choisissez **Host**. Le
+fichier `TradeTogether_RelayHost.ini` reste fourni dans le depot comme modele
+manuel si vous preferez utiliser l'override separe.
 
 Chaque client distant peut rester en configuration automatique :
 
@@ -176,8 +191,8 @@ Le journal se trouve dans
 .\build_release.bat
 ```
 
-Le script compile la DLL, la copie avec l'INI dans le paquet et cree :
+Le script compile la DLL, prepare les profils FOMOD Host / Client Local et cree :
 
 ```text
-dist/TradeTogether-v0.7.0-Vortex.zip
+dist/TradeTogether-v0.7.1-Vortex.zip
 ```
