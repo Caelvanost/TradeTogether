@@ -2,5 +2,11 @@
 
 namespace TradeTogether::Trade
 {
-    bool OpenCrosshairActorInventory();
+    bool Initialize();
+    void Shutdown();
+    void Reset();
+    void Update();
+
+    bool RequestCrosshairActorTrade();
+    void HandleNetworkPacket(std::string a_packet);
 }

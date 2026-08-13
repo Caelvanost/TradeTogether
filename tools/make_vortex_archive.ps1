@@ -1,6 +1,6 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.3.1"
+    [string]$Version = "0.4.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,4 +42,4 @@ Compress-Archive -LiteralPath $dataDir -DestinationPath $archivePath -Compressio
 
 Write-Host "[TradeTogether] Archive Vortex creee:" -ForegroundColor Green
 Write-Host "  $archivePath"
-Write-Host "[TradeTogether] Contenu: Data\SKSE\Plugins\TradeTogether.dll"
+Write-Host "[TradeTogether] Contenu: TradeTogether.dll + TradeTogether.ini"

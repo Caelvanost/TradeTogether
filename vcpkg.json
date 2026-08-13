@@ -1,8 +1,8 @@
 {
     "name":  "tradetogether",
-    "version-string":  "0.3.1",
+    "version-string":  "0.4.0",
     "dependencies":  [
                          "commonlibsse-ng"
                      ],
-    "builtin-baseline":  "ea1a7396b05637a53bf23c078647ecc0edee4b80"
+    "builtin-baseline":  "ef3a5a82e39424b7f5740c4576f027c3173767f4"
 }

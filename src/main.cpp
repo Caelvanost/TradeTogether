@@ -1,5 +1,6 @@
 #include "PCH.h"
 #include "Input.h"
+#include "Trade.h"
 
 namespace
 {
@@ -28,7 +29,14 @@ namespace
 
         if (a_message->type == SKSE::MessagingInterface::kDataLoaded) {
             TradeTogether::InputEventSink::GetSingleton()->Register();
-            spdlog::info("TradeTogether v0.3.1 ready - Papyrus OpenInventory mode");
+            const auto networkReady = TradeTogether::Trade::Initialize();
+            spdlog::info(
+                "TradeTogether v0.4.0 ready - remote confirmation network={}",
+                networkReady ? "ready" : "unavailable");
+        } else if (
+            a_message->type == SKSE::MessagingInterface::kPreLoadGame ||
+            a_message->type == SKSE::MessagingInterface::kNewGame) {
+            TradeTogether::Trade::Reset();
         }
     }
 }
@@ -38,7 +46,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
     SKSE::Init(a_skse);
     SetupLog();
 
-    spdlog::info("TradeTogether v0.3.1 loading");
+    spdlog::info("TradeTogether v0.4.0 loading");
 
     auto* messaging = SKSE::GetMessagingInterface();
     if (!messaging) {

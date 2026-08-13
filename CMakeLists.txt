@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(TradeTogether VERSION 0.3.1 LANGUAGES CXX)
+project(TradeTogether VERSION 0.4.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,10 +11,16 @@ find_package(CommonLibSSE REQUIRED)
 set(PROJECT_SOURCES
     src/PCH.h
     src/main.cpp
+    src/Config.h
+    src/Config.cpp
     src/Input.h
     src/Input.cpp
+    src/Protocol.h
+    src/Protocol.cpp
     src/Trade.h
     src/Trade.cpp
+    src/UdpTransport.h
+    src/UdpTransport.cpp
 )
 
 add_commonlibsse_plugin(${PROJECT_NAME}
@@ -31,6 +37,8 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /utf-8 /permissive-)
 endif()
+
+target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32)
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${PROJECT_SOURCES})
 

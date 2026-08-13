@@ -1,6 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
+set "TRADETOGETHER_BUILD_DIR=out\build-release"
 
 if "%VCPKG_ROOT%"=="" set "VCPKG_ROOT=C:\dev\vcpkg"
 
@@ -20,12 +21,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\ensure_vcpkg_bas
 if errorlevel 1 exit /b %errorlevel%
 
 echo [TradeTogether] Configuration CMake...
-cmake -S . -B build -A x64 ^
+cmake -S . -B "%TRADETOGETHER_BUILD_DIR%" -A x64 ^
   -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
 if errorlevel 1 exit /b %errorlevel%
 
 echo [TradeTogether] Compilation Release...
-cmake --build build --config Release
+cmake --build "%TRADETOGETHER_BUILD_DIR%" --config Release
 if errorlevel 1 exit /b %errorlevel%
 
 echo.
@@ -38,5 +39,5 @@ if errorlevel 1 exit /b %errorlevel%
 
 echo.
 echo [TradeTogether] Tout est pret.
-echo Archive Vortex: dist\TradeTogether-v0.3.1-Vortex.zip
+echo Archive Vortex: dist\TradeTogether-v0.4.0-Vortex.zip
 endlocal

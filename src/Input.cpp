@@ -26,6 +26,8 @@ namespace TradeTogether
         RE::InputEvent* const* a_event,
         RE::BSTEventSource<RE::InputEvent*>*)
     {
+        Trade::Update();
+
         if (!a_event) {
             return RE::BSEventNotifyControl::kContinue;
         }
@@ -42,7 +44,7 @@ namespace TradeTogether
 
             if (button->GetIDCode() == kF6ScanCode) {
                 spdlog::info("F6 pressed");
-                Trade::OpenCrosshairActorInventory();
+                Trade::RequestCrosshairActorTrade();
                 break;
             }
         }
