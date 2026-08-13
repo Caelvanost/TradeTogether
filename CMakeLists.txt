@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(TradeTogether VERSION 0.4.0 LANGUAGES CXX)
+project(TradeTogether VERSION 0.5.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,6 +15,8 @@ set(PROJECT_SOURCES
     src/Config.cpp
     src/Input.h
     src/Input.cpp
+    src/Offer.h
+    src/Offer.cpp
     src/Protocol.h
     src/Protocol.cpp
     src/Trade.h

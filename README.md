@@ -1,69 +1,70 @@
-# TradeTogether v0.4.0
+# TradeTogether v0.5.0
 
-Interface d’échange avec consentement distant pour Skyrim Together Reborn.
+Interface d’échange à offres synchronisées pour Skyrim Together Reborn.
 
-## Fonctionnement
+## Déroulement d’un échange
 
-1. Installez TradeTogether chez les deux joueurs et connectez-vous à Skyrim
-   Together Reborn.
-2. Visez l’autre personnage avec le réticule.
-3. Appuyez sur **F6**.
-4. TradeTogether envoie une demande au propriétaire du personnage ciblé.
-5. Le joueur ciblé reçoit une boîte de dialogue native Skyrim :
-   **Accepter** ou **Refuser**.
-6. L’inventaire ciblé ne s’ouvre chez le demandeur qu’après réception de
-   l’acceptation.
+1. Les deux joueurs installent la même version de TradeTogether et se
+   connectent à Skyrim Together Reborn.
+2. Le demandeur vise l’autre personnage et appuie sur **F6**.
+3. Le joueur ciblé reçoit le prompt **Accepter / Refuser**.
+4. Après acceptation, l’inventaire personnel s’ouvre chez les deux joueurs en
+   mode composition d’offre.
+5. Chaque joueur sélectionne ses objets :
 
-Une demande expire après 30 secondes. En cas de transport réseau indisponible,
-de refus, de délai dépassé ou de changement de cible, l’inventaire reste fermé.
+   - **E** : ajouter une unité de l’objet sélectionné ;
+   - **Suppr** : retirer une unité ;
+   - **F6** : afficher les deux offres et se déclarer prêt ;
+   - **Tab** : annuler tout l’échange.
+
+   TradeTogether n’utilise pas F8, F9 ou F10 afin de ne pas entrer en conflit
+   avec Heart of Magic, le chargement rapide et OStim Together.
+
+6. Toute modification retire automatiquement l’état « prêt ».
+7. Lorsque les deux joueurs sont prêts, chacun voit les deux paniers et doit
+   confirmer une dernière fois.
+8. Après la double confirmation, l’inventaire natif de la cible s’ouvre chez le
+   demandeur pour réaliser le transfert validé.
+
+Les objets de quête sont refusés. Une offre accepte jusqu’à 24 lignes et peut
+être vide afin d’autoriser un don à sens unique. La demande initiale expire
+après 30 secondes et une session inactive après 5 minutes.
+
+## Limite actuelle
+
+L’interface synchronise et verrouille l’intention des deux joueurs, mais elle
+ne déplace pas automatiquement les objets. Skyrim Together Reborn n’expose pas
+d’API publique stable garantissant le transfert des instances enchantées,
+améliorées ou renommées. Le transfert final reste donc manuel dans l’interface
+d’inventaire native déjà validée avec STR.
 
 ## Réseau
 
-TradeTogether utilise un petit canal UDP indépendant, car Skyrim Together
-Reborn ne fournit pas encore d’API publique permettant à un plugin SKSE tiers
-d’envoyer ce type de demande. La découverte est automatique sur le réseau local
-via le port UDP **27993**.
+TradeTogether utilise un canal UDP indépendant sur le port **27993**. La
+découverte est automatique sur un réseau local. Les deux joueurs doivent
+autoriser Skyrim dans leur pare-feu privé.
 
-Les deux joueurs doivent autoriser Skyrim dans le pare-feu privé et utiliser la
-même version de TradeTogether. Pour une connexion qui ne partage pas le même
-réseau local, désactivez `AutoDiscovery` et renseignez l’adresse IPv4 joignable
-dans `Data/SKSE/Plugins/TradeTogether.ini`; une redirection UDP peut être
-nécessaire selon le routeur.
+Pour une connexion sans découverte LAN, définissez `AutoDiscovery=0`,
+`PeerHost` et `PeerPort` dans
+`Data/SKSE/Plugins/TradeTogether.ini`. Une redirection UDP peut être nécessaire
+selon le routeur.
 
-## Inventaire et synchronisation
+Les joueurs sont associés par leur nom de personnage. Comme les versions
+précédentes, la cible initiale peut être tout `Actor` autre que le joueur local,
+car STR ne fournit pas d’API SKSE publique stable permettant de classifier ses
+acteurs distants.
 
-Après l’accord distant, TradeTogether appelle la fonction native Papyrus
-`Actor.OpenInventory(true)` sur le proxy local de l’acteur ciblé. Skyrim
-Together Reborn reste responsable de la synchronisation des objets et des
-données d’instance.
-
-Cette version identifie les propriétaires par le nom de personnage annoncé sur
-le canal TradeTogether. Comme la v0.3, elle accepte comme cible tout `Actor`
-autre que le joueur local : STR ne fournit pas d’API SKSE publique stable pour
-classifier formellement ses acteurs distants.
-
-Le journal
-`Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log` enregistre
-la découverte des pairs, les demandes, les réponses et l’ouverture finale.
+Le journal se trouve dans
+`Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log`.
 
 ## Build
-
-Depuis PowerShell dans le dossier du projet :
 
 ```powershell
 .\build_release.bat
 ```
 
-Le script :
+Le script compile la DLL, la copie avec l’INI dans le paquet et crée :
 
-- synchronise automatiquement la `builtin-baseline` avec `C:\dev\vcpkg` ;
-- configure CMake ;
-- compile en Release ;
-- copie `TradeTogether.dll` dans `package/Data/SKSE/Plugins` ;
-- crée `dist/TradeTogether-v0.4.0-Vortex.zip` avec la DLL et l’INI.
-
-## Archive Vortex sans recompiler
-
-```powershell
-.\make_vortex_archive.bat
+```text
+dist/TradeTogether-v0.5.0-Vortex.zip
 ```

@@ -16,6 +16,7 @@ namespace TradeTogether
         std::uint32_t discoveryIntervalMs{ 1000 };
         std::uint32_t peerTimeoutMs{ 10000 };
         std::uint32_t requestTimeoutMs{ 30000 };
+        std::uint32_t sessionTimeoutMs{ 300000 };
 
         static Config Load();
     };

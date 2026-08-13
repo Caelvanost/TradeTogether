@@ -125,6 +125,13 @@ namespace TradeTogether
                 config.requestTimeoutMs),
             5000U,
             120000U);
+        config.sessionTimeoutMs = std::clamp(
+            ReadUInt(
+                L"Trade",
+                L"SessionTimeoutMs",
+                config.sessionTimeoutMs),
+            60000U,
+            1800000U);
 
         return config;
     }

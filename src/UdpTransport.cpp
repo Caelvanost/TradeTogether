@@ -446,7 +446,8 @@ namespace TradeTogether
 
     void UdpTransport::ReceiverLoop()
     {
-        std::array<char, 4096> buffer{};
+        // A full 24-line offer can exceed 4 KiB once item names are hex encoded.
+        std::array<char, 8192> buffer{};
         while (_running.load()) {
             sockaddr_in source{};
             int sourceLength = sizeof(source);

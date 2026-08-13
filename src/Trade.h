@@ -7,6 +7,6 @@ namespace TradeTogether::Trade
     void Reset();
     void Update();
 
-    bool RequestCrosshairActorTrade();
+    void HandleKey(std::uint32_t a_scanCode);
     void HandleNetworkPacket(std::string a_packet);
 }
