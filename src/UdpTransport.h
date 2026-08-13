@@ -34,6 +34,7 @@ namespace TradeTogether
         {
             sockaddr_in address{};
             std::string name;
+            std::string instanceID;
             std::chrono::steady_clock::time_point lastSeen{};
         };
 
@@ -43,17 +44,39 @@ namespace TradeTogether
         UdpTransport& operator=(const UdpTransport&) = delete;
 
         void ReceiverLoop();
-        void DiscoveryLoop(std::stop_token a_stopToken);
+        void MaintenanceLoop(std::stop_token a_stopToken);
         void SendHello();
-        void SendHelloTo(const sockaddr_in& a_destination);
+        void SendHelloTo(
+            const sockaddr_in& a_destination,
+            bool a_useObservedSourcePort);
         bool HandleDiscovery(
             std::string_view a_packet,
             const sockaddr_in& a_source);
+        void RegisterPeer(
+            const sockaddr_in& a_source,
+            std::uint16_t a_advertisedPort,
+            std::string_view a_name,
+            std::string_view a_instanceID);
         void TouchGameplayPeer(
             std::string_view a_packet,
             const sockaddr_in& a_source);
         void ExpirePeers();
-        std::vector<sockaddr_in> SnapshotPeers(std::string_view a_playerName);
+        std::vector<sockaddr_in> SnapshotDestinations(
+            std::string_view a_playerName,
+            const sockaddr_in* a_excluded = nullptr);
+        void RelayGameplayPacket(
+            std::string_view a_packet,
+            const sockaddr_in& a_source);
+        bool SendPacketTo(
+            std::string_view a_packet,
+            const sockaddr_in& a_destination,
+            std::string_view a_operation);
+        std::optional<sockaddr_in> ResolveRemotePeer(
+            const Config::RemotePeer& a_peer) const;
+        std::string SignPacket(std::string a_packet) const;
+        bool AuthenticatePacket(std::string_view a_packet) const;
+        static std::string RemoveAuthField(std::string_view a_packet);
+        std::string MarkRelayed(std::string_view a_packet) const;
 
         static std::string AddressToString(const sockaddr_in& a_address);
 
@@ -61,12 +84,11 @@ namespace TradeTogether
         PacketHandler _handler;
         SOCKET _socket{ INVALID_SOCKET };
         sockaddr_in _broadcast{};
-        sockaddr_in _manualPeer{};
-        bool _hasManualPeer{ false };
+        std::vector<sockaddr_in> _configuredPeers;
         std::string _instanceID;
 
         std::jthread _receiver;
-        std::jthread _discovery;
+        std::jthread _maintenance;
         std::atomic_bool _running{ false };
         std::mutex _sendMutex;
         std::mutex _peerMutex;

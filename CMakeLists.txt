@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(TradeTogether VERSION 0.5.0 LANGUAGES CXX)
+project(TradeTogether VERSION 0.6.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -40,7 +40,7 @@ if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /utf-8 /permissive-)
 endif()
 
-target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32)
+target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32 bcrypt)
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${PROJECT_SOURCES})
 
