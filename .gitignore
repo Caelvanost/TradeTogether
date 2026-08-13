@@ -16,7 +16,7 @@ vcpkg_installed/
 *.obj
 *.pdb
 
-# Release archives
+# Release archives and Vortex installation packages
 *.zip
 *.rar
 *.7z
