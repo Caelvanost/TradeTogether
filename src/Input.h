@@ -13,7 +13,10 @@ namespace TradeTogether
             RE::BSTEventSource<RE::InputEvent*>* a_eventSource) override;
 
     private:
-        static constexpr std::uint32_t kF6ScanCode = 0x40;
+        static constexpr std::uint32_t kTScanCode = 0x14;
+        // Trade.cpp still uses the historical F6 scan code as its internal
+        // request/validate action identifier. Input.cpp maps T to this value.
+        static constexpr std::uint32_t kTradeActionCode = 0x40;
         static constexpr std::uint32_t kEScanCode = 0x12;
         static constexpr std::uint32_t kTabScanCode = 0x0F;
         static constexpr std::uint32_t kDeleteScanCode = 0xD3;
