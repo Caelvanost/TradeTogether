@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <fomod>
-  <Name>TradeTogether</Name>
+  <Name>TradeTogether - Direct Inventory</Name>
   <Author>Caelvanost</Author>
-  <Version>0.7.2</Version>
-  <Description>Two-player trade offer interface for Skyrim Together Reborn. The installer lets you choose Host or Client / Local networking profile.</Description>
+  <Version>0.3.2</Version>
+  <Description>Direct native inventory access for Skyrim Together Reborn. Target another Actor and press T to open its inventory immediately.</Description>
 </fomod>
