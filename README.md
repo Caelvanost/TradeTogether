@@ -1,74 +1,73 @@
 # TradeTogether v0.7.1
 
-Interface d'echange a offres synchronisees pour Skyrim Together Reborn.
+Synchronized trade-offer interface for Skyrim Together Reborn.
 
-## Installation Vortex
+## Vortex installation
 
-L'archive Vortex utilise un FOMOD avec deux profils :
+The Vortex archive uses a FOMOD with two profiles:
 
-- **Client / Local** : choix recommande pour les clients distants, le LAN, ou
-  une installation sans relais Internet. Ce profil garde la decouverte LAN et
-  l'auto-detection de l'hote STR.
-- **Host** : choix a installer uniquement sur la machine qui heberge ou relaie
-  la session Internet. Ce profil active `RelayMode=1` et desactive
-  `AutoRemoteFromSTR`, car l'hote ne doit pas se cibler lui-meme via son
-  historique STR.
+- **Client / Local**: recommended for remote clients, LAN play, or an
+  installation without an Internet relay. This profile keeps LAN discovery and
+  automatic STR host detection enabled.
+- **Host**: install this only on the machine hosting or relaying the Internet
+  session. This profile enables `RelayMode=1` and disables `AutoRemoteFromSTR`,
+  because the host must not target itself through its STR history.
 
-Pour jouer a distance, installez **Host** sur la machine qui recoit la
-redirection UDP 27993, et **Client / Local** sur les autres joueurs.
+For remote play, install **Host** on the machine receiving the UDP 27993 port
+forward and **Client / Local** on the other players' machines.
 
-## Deroulement d'un echange
+## Trade flow
 
-1. Les deux joueurs installent la meme version de TradeTogether et se
-   connectent a Skyrim Together Reborn.
-2. Le demandeur vise l'autre personnage et appuie sur **F6**.
-3. Le joueur cible recoit le prompt **Accepter / Refuser**.
-4. Apres acceptation, l'inventaire personnel s'ouvre chez les deux joueurs en
-   mode composition d'offre.
-5. Chaque joueur selectionne ses objets :
+1. Both players install the same version of TradeTogether and connect to
+   Skyrim Together Reborn.
+2. The requester targets the other character and presses **F6**.
+3. The targeted player receives an **Accept / Refuse** prompt.
+4. After acceptance, the personal inventory opens for both players in offer
+   composition mode.
+5. Each player selects the items they want to offer:
 
-   - **E** : ajouter une unite de l'objet selectionne ;
-   - **Suppr** : retirer une unite ;
-   - **F6** : afficher les deux offres et se declarer pret ;
-   - **Tab** : annuler tout l'echange.
+   - **E**: add one unit of the selected item;
+   - **Delete**: remove one unit;
+   - **F6**: display both offers and mark yourself as ready;
+   - **Tab**: cancel the entire trade.
 
-   TradeTogether n'utilise pas F8, F9 ou F10 afin de ne pas entrer en conflit
-   avec Heart of Magic, le chargement rapide et OStim Together.
+   TradeTogether does not use F8, F9, or F10 to avoid conflicts with Heart of
+   Magic, quick load, and OStim Together.
 
-6. Toute modification retire automatiquement l'etat "pret".
-7. Lorsque les deux joueurs sont prets, chacun voit les deux paniers et doit
-   confirmer une derniere fois.
-8. Apres la double confirmation, l'inventaire natif de la cible s'ouvre chez le
-   demandeur pour realiser le transfert valide.
+6. Any offer change automatically clears the ready state.
+7. When both players are ready, each player sees both baskets and must confirm
+   one final time.
+8. After both players confirm, the target's native inventory opens for the
+   requester so the validated transfer can be completed manually.
 
-Les objets de quete sont refuses. Une offre accepte jusqu'a 24 lignes et peut
-etre vide afin d'autoriser un don a sens unique. La demande initiale expire
-apres 30 secondes et une session inactive apres 5 minutes.
+Quest items are rejected. An offer can contain up to 24 lines and may be empty,
+allowing one-way gifts. The initial request expires after 30 seconds, and an
+inactive session expires after 5 minutes.
 
-## Connexion distante automatique avec STR
+## Automatic remote connection through STR
 
-TradeTogether utilise toujours son propre canal UDP sur le port **27993**. Il
-ne parle pas dans le port STR et ne modifie pas le protocole STR.
+TradeTogether always uses its own UDP channel on port **27993**. It does not
+send data through the STR port and does not modify the STR protocol.
 
-La version 0.7.1 reprend la methode de MorphSyncTogether : quand un client STR
-s'est connecte en direct a un serveur, STR garde la derniere adresse utilisee
-dans son stockage Chromium :
+Version 0.7.1 follows the MorphSyncTogether approach: when an STR client has
+connected directly to a server, STR stores the last address used in its Chromium
+storage:
 
 ```text
 Data\SkyrimTogetherReborn\cache\Default\Local Storage\leveldb
 ```
 
-TradeTogether lit cette adresse, retire le port STR si elle en contient un,
-puis contacte le meme hote sur `AutoRemotePort`, par defaut **27993**.
+TradeTogether reads this address, strips the STR port if present, then contacts
+the same host using `AutoRemotePort`, which defaults to **27993**.
 
-Exemple :
+Example:
 
 ```text
 STR direct connect : 82.65.51.103:10578
 TradeTogether      : 82.65.51.103:27993
 ```
 
-Configuration client par defaut :
+Default client configuration:
 
 ```ini
 [Network]
@@ -83,18 +82,18 @@ RemotePeers=
 SharedSecret=
 ```
 
-En pratique, le client distant se connecte d'abord au serveur STR, puis
-TradeTogether recupere automatiquement l'hote STR au lancement ou pendant les
-essais periodiques suivants. Si STR n'a encore rien enregistre, `RemotePeers`
-reste disponible comme solution manuelle.
+In practice, the remote client first connects to the STR server. TradeTogether
+then automatically retrieves the STR host at startup or during subsequent
+periodic attempts. If STR has not stored a usable address yet, `RemotePeers`
+remains available as a manual fallback.
 
-## Configuration Internet recommandee : un relais
+## Recommended Internet setup: relay
 
-Choisissez la machine qui heberge la session Skyrim Together, ou celle qui a le
-plus facilement acces au routeur. Ouvrez/redirigez le port **UDP 27993** vers
-ce PC et autorisez Skyrim dans le pare-feu Windows.
+Choose the machine hosting the Skyrim Together session, or whichever machine
+has the easiest router access. Open/forward **UDP port 27993** to this PC and
+allow Skyrim through the Windows Firewall.
 
-Machine relais :
+Relay machine:
 
 ```ini
 [Network]
@@ -106,14 +105,14 @@ AutoRemoteFromSTR=0
 AutoRemotePort=27993
 AutoSharedSecretFromSTR=0
 RemotePeers=
-SharedSecret=remplacez-par-la-meme-valeur-privee-partout
+SharedSecret=replace-with-the-same-private-value-everywhere
 ```
 
-Le FOMOD installe automatiquement ce profil si vous choisissez **Host**. Le
-fichier `TradeTogether_RelayHost.ini` reste fourni dans le depot comme modele
-manuel si vous preferez utiliser l'override separe.
+The FOMOD installs this profile automatically when you select **Host**. The
+`TradeTogether_RelayHost.ini` file is still included in the repository as a
+manual template if you prefer using the separate override.
 
-Chaque client distant peut rester en configuration automatique :
+Each remote client can remain on the automatic configuration:
 
 ```ini
 [Network]
@@ -124,65 +123,62 @@ LocalPort=27993
 AutoRemoteFromSTR=1
 AutoRemotePort=27993
 RemotePeers=
-SharedSecret=remplacez-par-la-meme-valeur-privee-partout
+SharedSecret=replace-with-the-same-private-value-everywhere
 ```
 
-Les clients envoient des paquets de decouverte periodiques au relais. Cela
-ouvre leur route NAT sortante, donc ils n'ont normalement pas besoin de
-redirection de port. Le relais apprend leur adresse publique observee et
-transmet les paquets d'echange aux autres pairs actifs. Les paquets relayes
-sont marques pour eviter les boucles.
+Clients periodically send discovery packets to the relay. This opens their
+outbound NAT mapping, so they normally do not need their own port forwarding.
+The relay learns their observed public addresses and forwards trade packets to
+other active peers. Relayed packets are marked to prevent forwarding loops.
 
-## Secret partage
+## Shared secret
 
-`SharedSecret` active une signature HMAC-SHA256 sur les paquets de decouverte
-et d'echange. La valeur doit etre identique chez tous les joueurs et n'est
-jamais transmise sur le reseau.
+`SharedSecret` enables HMAC-SHA256 signing for discovery and trade packets. The
+value must be identical for every player and is never transmitted over the
+network.
 
-Option avancee, comme MorphSyncTogether : si `AutoSharedSecretFromSTR=1` et
-que `SharedSecret` est vide, TradeTogether tente de reutiliser le mot de passe
-STR :
+Advanced option, following MorphSyncTogether: if `AutoSharedSecretFromSTR=1`
+and `SharedSecret` is empty, TradeTogether attempts to reuse the STR password:
 
-- en mode relais, il lit `sPassword` dans
-  `Data\SkyrimTogetherReborn\config\STServer.ini` ;
-- en mode client, il lit le mot de passe direct-connect sauvegarde par STR.
+- in relay mode, it reads `sPassword` from
+  `Data\SkyrimTogetherReborn\config\STServer.ini`;
+- in client mode, it reads the direct-connect password saved by STR.
 
-Si aucun mot de passe STR n'est trouve, utilisez `SharedSecret` manuellement.
+If no STR password can be found, configure `SharedSecret` manually.
 
-## Pairs Internet directs
+## Direct Internet peers
 
-Sans relais, laissez `RelayMode=0` et listez tous les autres endpoints publics.
-Chaque joueur liste doit ouvrir son propre port UDP :
+Without a relay, leave `RelayMode=0` and list all other public endpoints. Every
+listed player must expose their own UDP port:
 
 ```ini
-RemotePeers=joueur-2.example:27993,203.0.113.8:27994
+RemotePeers=player-2.example:27993,203.0.113.8:27994
 ```
 
-`RemotePeers` accepte les IPv4 et les noms DNS, separes par virgule ou
-point-virgule. L'ancien couple `PeerHost` / `PeerPort` reste supporte et est
-ajoute a `RemotePeers`.
+`RemotePeers` accepts IPv4 addresses and DNS names separated by commas or
+semicolons. The legacy `PeerHost` / `PeerPort` pair is still supported and is
+added to `RemotePeers`.
 
-## A propos du serveur STR
+## About the STR server
 
-On peut reutiliser l'adresse de la machine STR, mais pas le port STR comme
-canal TradeTogether. Le serveur STR peut heberger le relais TradeTogether si le
-port UDP 27993 est expose, mais STR ne relaye pas automatiquement les paquets
-TradeTogether.
+You can reuse the STR machine's address, but not the STR port as the
+TradeTogether channel. The STR server machine can also host the TradeTogether
+relay if UDP port 27993 is exposed, but STR does not automatically relay
+TradeTogether packets.
 
-## Limite actuelle
+## Current limitation
 
-L'interface synchronise et verrouille l'intention des deux joueurs, mais elle
-ne deplace pas automatiquement les objets. Skyrim Together Reborn n'expose pas
-d'API publique stable garantissant le transfert des instances enchantees,
-ameliorees ou renommees. Le transfert final reste donc manuel dans l'interface
-d'inventaire native deja validee avec STR.
+The interface synchronizes and locks both players' intent, but it does not move
+items automatically. Skyrim Together Reborn does not expose a stable public API
+that guarantees transfer of enchanted, tempered, or renamed item instances.
+The final transfer therefore remains manual through the native inventory
+interface already validated with STR.
 
-Les joueurs sont associes par leur nom de personnage. Comme les versions
-precedentes, la cible initiale peut etre tout `Actor` autre que le joueur local,
-car STR ne fournit pas d'API SKSE publique stable permettant de classifier ses
-acteurs distants.
+Players are associated by their character name. As in previous versions, the
+initial target may be any `Actor` other than the local player because STR does
+not expose a stable public SKSE API for formally identifying its remote actors.
 
-Le journal se trouve dans
+The log is located at:
 `Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log`.
 
 ## Build
@@ -191,7 +187,8 @@ Le journal se trouve dans
 .\build_release.bat
 ```
 
-Le script compile la DLL, prepare les profils FOMOD Host / Client Local et cree :
+The script builds the DLL, prepares the Host / Client Local FOMOD profiles, and
+creates:
 
 ```text
 dist/TradeTogether-v0.7.1-Vortex.zip
