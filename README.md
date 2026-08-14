@@ -1,69 +1,67 @@
 # TradeTogether v0.5.0
 
-Interface d’échange à offres synchronisées pour Skyrim Together Reborn.
+Synchronized trade-offer interface for Skyrim Together Reborn.
 
-## Raccourci clavier
+## Keyboard shortcut
 
-TradeTogether utilise **T** pour ouvrir un échange avec le joueur visé et pour
-valider l’offre pendant l’échange.
+TradeTogether uses **T** to start a trade with the targeted player and to
+validate your offer during the trade.
 
-Dans Skyrim, **T est normalement assignée à la fonction Attendre (Wait)**.
-Avant d’utiliser TradeTogether, ouvrez les contrôles du jeu et retirez ou
-réassignez la touche **T** de la commande **Attendre** afin d’éviter tout conflit.
+In Skyrim, **T is normally bound to Wait**. Before using TradeTogether, open
+the game controls and unbind or reassign **T** from the **Wait** command to
+avoid conflicts.
 
-## Déroulement d’un échange
+## Trade flow
 
-1. Les deux joueurs installent la même version de TradeTogether et se
-   connectent à Skyrim Together Reborn.
-2. Le demandeur vise l’autre personnage et appuie sur **T**.
-3. Le joueur ciblé reçoit le prompt **Accepter / Refuser**.
-4. Après acceptation, l’inventaire personnel s’ouvre chez les deux joueurs en
-   mode composition d’offre.
-5. Chaque joueur sélectionne ses objets :
+1. Both players install the same version of TradeTogether and connect to
+   Skyrim Together Reborn.
+2. The requester targets the other character and presses **T**.
+3. The targeted player receives an **Accept / Refuse** prompt.
+4. After acceptance, the personal inventory opens for both players in offer
+   composition mode.
+5. Each player selects the items they want to offer:
 
-   - **E** : ajouter une unité de l’objet sélectionné ;
-   - **Suppr** : retirer une unité ;
-   - **T** : afficher les deux offres et se déclarer prêt ;
-   - **Tab** : annuler tout l’échange.
+   - **E**: add one unit of the selected item;
+   - **Delete**: remove one unit;
+   - **T**: display both offers and mark yourself as ready;
+   - **Tab**: cancel the entire trade.
 
-   TradeTogether n’utilise pas F8, F9 ou F10 afin de ne pas entrer en conflit
-   avec Heart of Magic, le chargement rapide et OStim Together.
+   TradeTogether does not use F8, F9, or F10 to avoid conflicts with Heart of
+   Magic, quick load, and OStim Together.
 
-6. Toute modification retire automatiquement l’état « prêt ».
-7. Lorsque les deux joueurs sont prêts, chacun voit les deux paniers et doit
-   confirmer une dernière fois.
-8. Après la double confirmation, l’inventaire natif de la cible s’ouvre chez le
-   demandeur pour réaliser le transfert validé.
+6. Any offer change automatically clears the ready state.
+7. When both players are ready, each player sees both baskets and must confirm
+   one final time.
+8. After both players confirm, the target's native inventory opens for the
+   requester so the validated transfer can be completed manually.
 
-Les objets de quête sont refusés. Une offre accepte jusqu’à 24 lignes et peut
-être vide afin d’autoriser un don à sens unique. La demande initiale expire
-après 30 secondes et une session inactive après 5 minutes.
+Quest items are rejected. An offer can contain up to 24 lines and may be empty,
+allowing one-way gifts. The initial request expires after 30 seconds, and an
+inactive session expires after 5 minutes.
 
-## Limite actuelle
+## Current limitation
 
-L’interface synchronise et verrouille l’intention des deux joueurs, mais elle
-ne déplace pas automatiquement les objets. Skyrim Together Reborn n’expose pas
-d’API publique stable garantissant le transfert des instances enchantées,
-améliorées ou renommées. Le transfert final reste donc manuel dans l’interface
-d’inventaire native déjà validée avec STR.
+The interface synchronizes and locks both players' intent, but it does not move
+items automatically. Skyrim Together Reborn does not expose a stable public API
+that guarantees transfer of enchanted, tempered, or renamed item instances.
+The final transfer therefore remains manual through the native inventory
+interface already validated with STR.
 
-## Réseau
+## Network
 
-TradeTogether utilise un canal UDP indépendant sur le port **27993**. La
-découverte est automatique sur un réseau local. Les deux joueurs doivent
-autoriser Skyrim dans leur pare-feu privé.
+TradeTogether uses an independent UDP channel on port **27993**. Discovery is
+automatic on a local network. Both players must allow Skyrim through their
+private-network firewall.
 
-Pour une connexion sans découverte LAN, définissez `AutoDiscovery=0`,
-`PeerHost` et `PeerPort` dans
-`Data/SKSE/Plugins/TradeTogether.ini`. Une redirection UDP peut être nécessaire
-selon le routeur.
+For a connection without LAN discovery, set `AutoDiscovery=0`, `PeerHost`, and
+`PeerPort` in `Data/SKSE/Plugins/TradeTogether.ini`. UDP port forwarding may be
+required depending on the router.
 
-Les joueurs sont associés par leur nom de personnage. Comme les versions
-précédentes, la cible initiale peut être tout `Actor` autre que le joueur local,
-car STR ne fournit pas d’API SKSE publique stable permettant de classifier ses
-acteurs distants.
+Players are associated by their character name. As in previous versions, the
+initial target may be any `Actor` other than the local player because STR does
+not expose a stable public SKSE API for formally identifying its remote actors.
 
-Le journal se trouve dans
+The log is located at:
 `Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log`.
 
 ## Build
@@ -72,7 +70,8 @@ Le journal se trouve dans
 .\build_release.bat
 ```
 
-Le script compile la DLL, la copie avec l’INI dans le paquet et crée :
+The script builds the DLL, copies it together with the INI into the package,
+and creates:
 
 ```text
 dist/TradeTogether-v0.5.0-Vortex.zip
