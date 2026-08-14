@@ -17,11 +17,20 @@ L'archive Vortex utilise un FOMOD avec deux profils :
 Pour jouer a distance, installez **Host** sur la machine qui recoit la
 redirection UDP 27993, et **Client / Local** sur les autres joueurs.
 
+## Raccourci clavier
+
+TradeTogether utilise **T** pour ouvrir un echange avec le joueur vise et pour
+valider l'offre pendant l'echange.
+
+Dans Skyrim, **T est normalement assignee a la fonction Attendre (Wait)**.
+Avant d'utiliser TradeTogether, ouvrez les controles du jeu et retirez ou
+reassignez la touche **T** de la commande **Attendre** afin d'eviter tout conflit.
+
 ## Deroulement d'un echange
 
 1. Les deux joueurs installent la meme version de TradeTogether et se
    connectent a Skyrim Together Reborn.
-2. Le demandeur vise l'autre personnage et appuie sur **F6**.
+2. Le demandeur vise l'autre personnage et appuie sur **T**.
 3. Le joueur cible recoit le prompt **Accepter / Refuser**.
 4. Apres acceptation, l'inventaire personnel s'ouvre chez les deux joueurs en
    mode composition d'offre.
@@ -29,7 +38,7 @@ redirection UDP 27993, et **Client / Local** sur les autres joueurs.
 
    - **E** : ajouter une unite de l'objet selectionne ;
    - **Suppr** : retirer une unite ;
-   - **F6** : afficher les deux offres et se declarer pret ;
+   - **T** : afficher les deux offres et se declarer pret ;
    - **Tab** : annuler tout l'echange.
 
    TradeTogether n'utilise pas F8, F9 ou F10 afin de ne pas entrer en conflit
