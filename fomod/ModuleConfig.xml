@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd">
-  <moduleName>TradeTogether 0.7.1</moduleName>
+  <moduleName>TradeTogether 0.3.2 - Direct Inventory</moduleName>
   <requiredInstallFiles>
     <folder source="00 Core" destination="" priority="0" />
   </requiredInstallFiles>
   <installSteps order="Explicit">
-    <installStep name="Network profile">
+    <installStep name="Legacy network profile">
       <optionalFileGroups order="Explicit">
-        <group name="Which profile should be installed?" type="SelectExactlyOne">
+        <group name="Which inherited network profile should be installed?" type="SelectExactlyOne">
           <plugins order="Explicit">
             <plugin name="Client / Local">
-              <description>Default profile for local play and remote clients. LAN discovery stays enabled, and remote clients automatically reuse STR's saved direct-connect host when available.</description>
+              <description>Recommended. The T direct-inventory action does not require TradeTogether network confirmation; this keeps the inherited client/local network settings.</description>
               <files>
                 <folder source="10 Client Local" destination="" priority="10" />
               </files>
@@ -19,7 +19,7 @@
               </typeDescriptor>
             </plugin>
             <plugin name="Host">
-              <description>Use this only on the Skyrim Together host / relay machine. You must forward UDP port 27993 to this PC and allow UDP 27993 in Windows Firewall. Remote clients can stay on Client / Local.</description>
+              <description>Optional inherited relay profile. It is not required for the T direct-inventory action itself.</description>
               <files>
                 <folder source="20 Host" destination="" priority="20" />
               </files>
