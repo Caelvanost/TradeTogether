@@ -39,11 +39,18 @@ The **T direct-inventory action itself does not use the synchronized offer proto
 
 Some legacy synchronized-offer and remote-network code is still present in the source tree and the Trade subsystem is still initialized at startup. That inherited code is not triggered by the direct-inventory keyboard path.
 
+## Vortex installation
+
+The Vortex package is versioned as **0.3.2** and still contains the inherited FOMOD network-profile choice:
+
+- **Client / Local** is the recommended option for normal use;
+- **Host** is an optional legacy relay profile and is not required for the T direct-inventory action.
+
+These profiles only configure the inherited network subsystem. They do not change the direct T-to-inventory behavior.
+
 ## Version
 
-The canonical version of this branch is **0.3.2**, as defined by `CMakeLists.txt`.
-
-Some inherited packaging and log strings still report versions from the later 0.7.x development line. Those strings are legacy leftovers and do not represent the canonical version or behavior of this branch.
+The canonical version of this branch is **0.3.2**. The CMake project version, runtime log strings, FOMOD metadata, archive scripts, and example configuration files are aligned to this version.
 
 ## Log
 
@@ -67,4 +74,8 @@ The DLL is copied to:
 package\Data\SKSE\Plugins\TradeTogether.dll
 ```
 
-Note: the inherited archive/FOMOD scripts still contain 0.7.x version labels and should be updated separately if a correctly versioned v0.3.2 Vortex package is required.
+The Vortex-ready archive is created as:
+
+```text
+dist\TradeTogether-v0.3.2-Vortex.zip
+```
