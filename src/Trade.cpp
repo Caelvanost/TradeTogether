@@ -214,7 +214,7 @@ namespace TradeTogether::Trade
                 QueueInventoryMessage(RE::UI_MESSAGE_TYPE::kShow);
             }
             Notify(
-                "Offre: E ajouter | Suppr retirer | F6 valider | Tab annuler");
+                "Offre: Insert ajouter | Suppr retirer | T valider | Tab annuler");
         }
 
         void ScheduleOpenOfferInventory()
