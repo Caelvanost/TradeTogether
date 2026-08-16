@@ -1,6 +1,6 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.5.0"
+    [string]$Version = "0.5.1"
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,14 +21,17 @@ while ($ProjectRoot.EndsWith('\') -or $ProjectRoot.EndsWith('/')) {
 $ProjectRoot = [System.IO.Path]::GetFullPath($ProjectRoot)
 
 $packageDir = Join-Path $ProjectRoot "package"
-$dataDir = Join-Path $packageDir "Data"
-$pluginDir = Join-Path (Join-Path $dataDir "SKSE") "Plugins"
+$pluginDir = Join-Path $packageDir "Data\SKSE\Plugins"
 $dllPath = Join-Path $pluginDir "TradeTogether.dll"
+$iniPath = Join-Path $pluginDir "TradeTogether.ini"
 $distDir = Join-Path $ProjectRoot "dist"
 $archivePath = Join-Path $distDir ("TradeTogether-v{0}-Vortex.zip" -f $Version)
 
 if (-not (Test-Path -LiteralPath $dllPath -PathType Leaf)) {
     throw "DLL introuvable: $dllPath. Compile d'abord avec build_release.bat."
+}
+if (-not (Test-Path -LiteralPath $iniPath -PathType Leaf)) {
+    throw "INI introuvable: $iniPath"
 }
 
 New-Item -ItemType Directory -Path $distDir -Force | Out-Null
@@ -37,9 +40,11 @@ if (Test-Path -LiteralPath $archivePath) {
     Remove-Item -LiteralPath $archivePath -Force
 }
 
-# Put Data\ at the root of the archive so the ZIP is directly importable by Vortex.
-Compress-Archive -LiteralPath $dataDir -DestinationPath $archivePath -CompressionLevel Optimal
+Compress-Archive `
+    -Path (Join-Path $packageDir "*") `
+    -DestinationPath $archivePath `
+    -CompressionLevel Optimal `
+    -Force
 
 Write-Host "[TradeTogether] Archive Vortex creee:" -ForegroundColor Green
 Write-Host "  $archivePath"
-Write-Host "[TradeTogether] Contenu: TradeTogether.dll + TradeTogether.ini"
