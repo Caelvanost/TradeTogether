@@ -32,6 +32,12 @@
 #include <utility>
 #include <vector>
 
+#include "SafeMessageBox.h"
+
+// Route the legacy RE::CreateMessage calls used by Trade.cpp through a
+// MessageBoxData implementation that owns its callback and explicit button list.
+#define CreateMessage SafeCreateMessage
+
 // CommonLibSSE-NG generates __TradeTogetherPlugin.cpp with "..."sv.
 // Keep the literal visible to that generated translation unit on MSVC.
 using namespace std::string_view_literals;
