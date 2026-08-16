@@ -1,6 +1,6 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.5.3"
+    [string]$Version = "0.5.4"
 )
 
 $ErrorActionPreference = "Stop"
