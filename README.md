@@ -1,4 +1,4 @@
-# TradeTogether v0.5.2
+# TradeTogether v0.5.3
 
 Synchronized trade-offer interface for Skyrim Together Reborn.
 
@@ -21,13 +21,14 @@ avoid conflicts.
    composition mode.
 5. Each player selects the items they want to offer:
 
-   - **A**: add one unit of the selected item;
+   - **Insert**: add one unit of the selected item;
    - **Delete**: remove one unit;
    - **T**: display both offers and mark yourself as ready;
    - **Tab**: cancel the entire trade.
 
-   TradeTogether deliberately does not use **E** for adding items because E is
-   also used by Skyrim to consume or activate some inventory items.
+   TradeTogether deliberately avoids **E** because Skyrim uses it to consume or
+   activate inventory items, and avoids **A** because Skyrim uses it for
+   inventory favorites by default.
 
    TradeTogether does not use F8, F9, or F10 to avoid conflicts with Heart of
    Magic, quick load, and OStim Together.
@@ -77,5 +78,5 @@ The script builds the DLL, copies it together with the INI into the package,
 and creates:
 
 ```text
-dist/TradeTogether-v0.5.2-Vortex.zip
+dist/TradeTogether-v0.5.3-Vortex.zip
 ```
