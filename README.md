@@ -1,4 +1,4 @@
-# TradeTogether v0.5.0
+# TradeTogether v0.5.1
 
 Synchronized trade-offer interface for Skyrim Together Reborn.
 
@@ -74,5 +74,5 @@ The script builds the DLL, copies it together with the INI into the package,
 and creates:
 
 ```text
-dist/TradeTogether-v0.5.0-Vortex.zip
+dist/TradeTogether-v0.5.1-Vortex.zip
 ```
