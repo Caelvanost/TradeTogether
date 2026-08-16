@@ -19,6 +19,8 @@ set(PROJECT_SOURCES
     src/Offer.cpp
     src/Protocol.h
     src/Protocol.cpp
+    src/SafeMessageBox.h
+    src/SafeMessageBox.cpp
     src/Trade.h
     src/Trade.cpp
     src/UdpTransport.h
