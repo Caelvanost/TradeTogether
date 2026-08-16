@@ -20,7 +20,7 @@ namespace TradeTogether
 
         inputManager->AddEventSink(GetSingleton());
         spdlog::info(
-            "Input event sink registered (T=request/validate, E=add, Delete=remove, Tab=cancel)");
+            "Input event sink registered (T=request/validate, A=add, Delete=remove, Tab=cancel)");
     }
 
     RE::BSEventNotifyControl InputEventSink::ProcessEvent(
@@ -50,8 +50,13 @@ namespace TradeTogether
                 break;
             }
 
-            if (scanCode == kEScanCode ||
-                scanCode == kDeleteScanCode ||
+            if (scanCode == kAScanCode) {
+                spdlog::debug("Trade add key pressed: A / DIK 0x{:02X}", scanCode);
+                Trade::HandleKey(kAddActionCode);
+                break;
+            }
+
+            if (scanCode == kDeleteScanCode ||
                 scanCode == kTabScanCode) {
                 spdlog::debug("Trade key pressed: DIK 0x{:02X}", scanCode);
                 Trade::HandleKey(scanCode);
