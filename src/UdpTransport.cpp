@@ -200,10 +200,11 @@ namespace TradeTogether
         }
 
         spdlog::info(
-            "Trade UDP started: player=\"{}\" port={} discovery={} instance={}",
+            "Trade UDP started: player=\"{}\" port={} discovery={} manualPeer={} instance={}",
             GetLocalPlayerName(),
             _config.localPort,
             _config.autoDiscovery ? 1 : 0,
+            _hasManualPeer ? 1 : 0,
             _instanceID);
         return true;
     }
@@ -405,8 +406,15 @@ namespace TradeTogether
             if (destinations.empty()) {
                 destinations.push_back(_broadcast);
             }
-        } else if (_hasManualPeer) {
-            destinations.push_back(_manualPeer);
+        } else {
+            // Remote mode: the client starts with the host's public endpoint.
+            // The host has no configured PeerHost; after receiving the first
+            // gameplay packet it learns the client's real source endpoint in
+            // TouchGameplayPeer() and can reply to that learned peer.
+            destinations = SnapshotPeers(a_playerName);
+            if (destinations.empty() && _hasManualPeer) {
+                destinations.push_back(_manualPeer);
+            }
         }
 
         if (destinations.empty()) {
