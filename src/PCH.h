@@ -33,10 +33,12 @@
 #include <utility>
 #include <vector>
 
+#include "Localization.h"
 #include "SafeMessageBox.h"
 
-// Route the legacy RE::CreateMessage calls used by Trade.cpp through a
-// MessageBoxData implementation that owns its callback and explicit button list.
+// Route legacy user-facing calls through TradeTogether's English localization
+// layer while keeping the trade logic itself unchanged.
+#define DebugNotification LocalizedDebugNotification
 #define CreateMessage SafeCreateMessage
 
 // CommonLibSSE-NG generates __TradeTogetherPlugin.cpp with "..."sv.
