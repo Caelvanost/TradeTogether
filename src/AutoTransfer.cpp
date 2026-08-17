@@ -7,6 +7,8 @@ namespace TradeTogether::AutoTransfer
 {
     namespace
     {
+        constexpr RE::FormID kGoldFormID = 0x0000000F;
+
         struct StackMatch
         {
             RE::ExtraDataList* extraList{ nullptr };
@@ -24,6 +26,19 @@ namespace TradeTogether::AutoTransfer
         RE::TESBoundObject* LookupObject(RE::FormID a_formID)
         {
             return RE::TESForm::LookupByID<RE::TESBoundObject>(a_formID);
+        }
+
+        std::int32_t GetObjectCount(
+            RE::PlayerCharacter* a_player,
+            RE::TESBoundObject* a_object)
+        {
+            if (!a_player || !a_object) {
+                return 0;
+            }
+
+            const auto counts = a_player->GetInventoryCounts();
+            const auto iterator = counts.find(a_object);
+            return iterator != counts.end() ? std::max(iterator->second, 0) : 0;
         }
 
         std::string GetActorName(RE::Actor* a_actor)
@@ -158,11 +173,38 @@ namespace TradeTogether::AutoTransfer
             }
             return true;
         }
+
+        bool ValidateGold(
+            RE::PlayerCharacter* a_player,
+            std::uint32_t a_gold,
+            std::string& a_error)
+        {
+            if (a_gold == 0) {
+                return true;
+            }
+
+            auto* gold = LookupObject(kGoldFormID);
+            if (!gold) {
+                a_error = "or introuvable";
+                return false;
+            }
+
+            const auto available = GetObjectCount(a_player, gold);
+            if (available < static_cast<std::int32_t>(a_gold)) {
+                a_error = fmt::format(
+                    "or insuffisant ({} disponible, {} requis)",
+                    available,
+                    a_gold);
+                return false;
+            }
+            return true;
+        }
     }
 
     bool ValidateLocalOffer(
         RE::PlayerCharacter* a_player,
         const Offer& a_offer,
+        std::uint32_t a_gold,
         std::string& a_error)
     {
         if (!a_player) {
@@ -175,22 +217,28 @@ namespace TradeTogether::AutoTransfer
                 return false;
             }
         }
-        return true;
+        return ValidateGold(a_player, a_gold, a_error);
     }
 
     bool ExecuteLocalExchange(
         RE::PlayerCharacter* a_player,
         const Offer& a_localOffer,
         const Offer&,
+        std::uint32_t a_localGold,
+        std::uint32_t,
         std::string& a_error)
     {
-        // Validate every local line before touching the inventory. No extra UI
-        // is shown: this remains an invisible preflight after final confirmation.
-        if (!ValidateLocalOffer(a_player, a_localOffer, a_error)) {
+        // Validate every local line and the offered gold before touching the
+        // inventory. No extra UI is shown: this remains an invisible preflight.
+        if (!ValidateLocalOffer(
+                a_player,
+                a_localOffer,
+                a_localGold,
+                a_error)) {
             return false;
         }
 
-        if (a_localOffer.empty()) {
+        if (a_localOffer.empty() && a_localGold == 0) {
             return true;
         }
 
@@ -202,9 +250,7 @@ namespace TradeTogether::AutoTransfer
 
         // Move the exact local inventory stacks to STR's remote actor proxy.
         // Passing the original ExtraDataList makes Skyrim move the actual item
-        // instance instead of recreating it from the base FormID. Tempering,
-        // custom names, enchantments and charge therefore stay attached to the
-        // instance and STR can synchronize the same native container transfer.
+        // instance instead of recreating it from the base FormID.
         for (const auto& line : a_localOffer) {
             auto plan = BuildTransferPlan(a_player, line);
             auto remaining = static_cast<std::int32_t>(line.quantity);
@@ -256,6 +302,25 @@ namespace TradeTogether::AutoTransfer
                     remaining);
                 return false;
             }
+        }
+
+        if (a_localGold > 0) {
+            auto* gold = LookupObject(kGoldFormID);
+            if (!gold) {
+                a_error = "or introuvable pendant le transfert";
+                return false;
+            }
+
+            a_player->RemoveItem(
+                gold,
+                static_cast<std::int32_t>(a_localGold),
+                RE::ITEM_REMOVE_REASON::kStoreInTeammate,
+                nullptr,
+                peerActor);
+            spdlog::info(
+                "Native gold transfer: amount={} peer={:08X}",
+                a_localGold,
+                peerActor->GetFormID());
         }
 
         return true;
