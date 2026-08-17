@@ -1,5 +1,6 @@
 #include "PCH.h"
 #include "SafeMessageBox.h"
+#include "Localization.h"
 
 #include <RE/B/BSTCreateFactoryManager.h>
 #include <RE/M/MessageBoxData.h>
@@ -36,14 +37,21 @@ namespace RE
             return;
         }
 
-        data->bodyText = a_message ? a_message : "";
+        const auto localizedBody = TradeTogether::Localization::TranslateUserText(
+            a_message ? std::string_view(a_message) : std::string_view{});
+        const auto localizedPrimary = TradeTogether::Localization::TranslateUserText(
+            a_buttonText ? std::string_view(a_buttonText) : std::string_view{});
+        const auto localizedSecondary = TradeTogether::Localization::TranslateUserText(
+            a_secondaryButtonText ? std::string_view(a_secondaryButtonText) : std::string_view{});
+
+        data->bodyText = localizedBody.c_str();
         data->buttonText.clear();
 
-        if (a_buttonText && *a_buttonText) {
-            data->buttonText.emplace_back(a_buttonText);
+        if (!localizedPrimary.empty()) {
+            data->buttonText.emplace_back(localizedPrimary.c_str());
         }
-        if (a_secondaryButtonText && *a_secondaryButtonText) {
-            data->buttonText.emplace_back(a_secondaryButtonText);
+        if (!localizedSecondary.empty()) {
+            data->buttonText.emplace_back(localizedSecondary.c_str());
         }
 
         data->unk38 = 0;
