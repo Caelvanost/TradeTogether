@@ -17,9 +17,6 @@ namespace TradeTogether
         bool Start(const Config& a_config, PacketHandler a_handler);
         void Stop();
 
-        // Sends directly to the discovered owner when possible. Before LAN
-        // discovery completes, one broadcast is used and receivers filter the
-        // packet by its encoded `to` field.
         bool SendTo(std::string_view a_playerName, std::string_view a_payload);
 
         [[nodiscard]] bool IsRunning() const noexcept
@@ -56,6 +53,10 @@ namespace TradeTogether
         void ExpirePeers();
         std::vector<sockaddr_in> SnapshotPeers(std::string_view a_playerName);
 
+        bool ConfigureManualPeer(std::string_view a_host, bool a_fromSTR);
+        void RefreshAutoRemoteFromSTR();
+        [[nodiscard]] std::optional<sockaddr_in> SnapshotManualPeer();
+
         static std::string AddressToString(const sockaddr_in& a_address);
 
         Config _config{};
@@ -64,6 +65,7 @@ namespace TradeTogether
         sockaddr_in _broadcast{};
         sockaddr_in _manualPeer{};
         bool _hasManualPeer{ false };
+        std::string _manualPeerHost;
         std::string _instanceID;
 
         std::jthread _receiver;
@@ -71,6 +73,7 @@ namespace TradeTogether
         std::atomic_bool _running{ false };
         std::mutex _sendMutex;
         std::mutex _peerMutex;
+        std::mutex _manualPeerMutex;
         std::unordered_map<std::string, Peer> _peers;
     };
 }
