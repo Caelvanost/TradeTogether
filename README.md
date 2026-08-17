@@ -1,6 +1,6 @@
-# TradeTogether v0.6.1
+# TradeTogether v0.7.0
 
-Synchronized trade-offer interface with automatic item transfer for Skyrim Together Reborn.
+Synchronized trade-offer interface with automatic instance-aware item transfer for Skyrim Together Reborn.
 
 ## Keyboard shortcut
 
@@ -30,47 +30,55 @@ avoid conflicts.
    activate inventory items, and avoids **A** because Skyrim uses it for
    inventory favorites by default.
 
-   TradeTogether does not use F8, F9, or F10 to avoid conflicts with Heart of
-   Magic, quick load, and OStim Together.
-
 6. Any offer change automatically clears the ready state.
 7. When both players are ready, each player sees both baskets and confirms one
    final time.
-8. After both confirmations, TradeTogether checks the local offer again and
-   automatically performs the exchange. No direct target inventory is opened.
-
-There are no extra confirmation steps for the automatic transfer. The final
-preflight is internal and only interrupts the exchange if an offered item is no
-longer available.
+8. After both confirmations, TradeTogether performs an invisible preflight and
+   automatically transfers the offered items. No direct inventory is opened and
+   there are no additional confirmation steps.
 
 Quest items are rejected. An offer can contain up to 24 lines and may be empty,
 allowing one-way gifts. The initial request expires after 30 seconds, and an
 inactive session expires after 5 minutes.
 
-## Automatic transfer
+## Native instance-aware transfer
 
-Each client modifies only its own real `PlayerCharacter` after both users have
-confirmed:
+v0.7.0 no longer recreates received equipment from only its base FormID.
+Instead, each client transfers the exact local inventory stack to Skyrim
+Together Reborn's proxy of the other player using Skyrim's native container
+transfer path.
 
-- the items in the local offer are removed from the local player;
-- the items in the remote offer are added to the local player.
+When an item has an `ExtraDataList`, that exact list is supplied to
+`RemoveItem`. The instance data therefore travels with the object rather than
+being discarded and rebuilt from the base form. This is intended to preserve,
+in particular:
 
-The synchronized offer payload carries the **FormID, quantity and display name**
-for every offered line so the receiving client can resolve the correct base
-object before executing the automatic transfer.
+- smithing / tempering improvements;
+- custom or extra enchantments;
+- enchantment charge;
+- custom item names;
+- other per-instance data carried by Skyrim's native extra-data list.
 
-This avoids depending on Skyrim Together Reborn's remote actor proxy for the
-actual inventory mutation.
+Standard stackable objects without per-instance data are still transferred as
+normal base stacks.
+
+TradeTogether identifies the active peer from the most recent trade-network
+packet, resolves the corresponding high-process actor by character name, and
+uses that STR proxy as the native transfer destination. The synchronized offer
+payload still carries FormID, quantity and display name for validation and UI;
+it is no longer used to reconstruct modified equipment on the receiving side.
 
 ### Current limitation
 
-v0.6.1 transfers items by **FormID and quantity**. This is suitable for normal
-stackable items and standard unmodified equipment.
+The transfer depends on Skyrim Together Reborn synchronizing the same native
+container operation used by direct inventory transfers. This architecture is
+specifically intended to preserve instance data instead of attempting to clone
+Skyrim's temporary enchantment forms ourselves.
 
-Custom instance data is not serialized yet. Renamed, tempered, uniquely
-custom-enchanted, or otherwise instance-modified equipment may therefore lose
-its per-instance properties if traded in this version. Support for preserving
-that extra data is a separate follow-up feature.
+If two different instances have the same base FormID **and the exact same
+display name**, Skyrim's inventory UI may not give TradeTogether enough visible
+information to distinguish which one was intended. The mod prefers matching
+`ExtraDataList` stacks before falling back to an unmodified base stack.
 
 ## Network
 
@@ -99,5 +107,5 @@ The script builds the DLL, copies it together with the INI into the package,
 and creates:
 
 ```text
-dist/TradeTogether-v0.6.1-Vortex.zip
+dist/TradeTogether-v0.7.0-Vortex.zip
 ```
