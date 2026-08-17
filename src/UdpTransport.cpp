@@ -47,6 +47,27 @@ namespace TradeTogether
         return "Player";
     }
 
+    std::optional<std::string> UdpTransport::GetMostRecentPeerName()
+    {
+        std::scoped_lock lock(_peerMutex);
+
+        const Peer* mostRecent = nullptr;
+        for (const auto& [key, peer] : _peers) {
+            if (peer.name.empty() ||
+                Protocol::EqualsInsensitive(peer.name, GetLocalPlayerName())) {
+                continue;
+            }
+            if (!mostRecent || peer.lastSeen > mostRecent->lastSeen) {
+                mostRecent = std::addressof(peer);
+            }
+        }
+
+        if (!mostRecent || mostRecent->name == "Peer") {
+            return std::nullopt;
+        }
+        return mostRecent->name;
+    }
+
     std::string UdpTransport::AddressToString(const sockaddr_in& a_address)
     {
         std::array<char, INET_ADDRSTRLEN> ip{};
