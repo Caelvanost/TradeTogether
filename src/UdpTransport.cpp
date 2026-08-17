@@ -1,6 +1,7 @@
 #include "PCH.h"
 #include "UdpTransport.h"
 #include "Protocol.h"
+#include "StrServerDiscovery.h"
 
 namespace TradeTogether
 {
@@ -80,6 +81,107 @@ namespace TradeTogether
             "{}:{}",
             ip.data(),
             ntohs(a_address.sin_port));
+    }
+
+    bool UdpTransport::ConfigureManualPeer(
+        std::string_view a_host,
+        bool a_fromSTR)
+    {
+        if (a_host.empty()) {
+            return false;
+        }
+
+        {
+            std::scoped_lock lock(_manualPeerMutex);
+            if (_hasManualPeer &&
+                Protocol::EqualsInsensitive(_manualPeerHost, a_host)) {
+                return true;
+            }
+        }
+
+        addrinfo hints{};
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_DGRAM;
+        hints.ai_protocol = IPPROTO_UDP;
+
+        addrinfo* addresses = nullptr;
+        const auto portText = std::to_string(_config.peerPort);
+        const auto status = getaddrinfo(
+            std::string(a_host).c_str(),
+            portText.c_str(),
+            &hints,
+            &addresses);
+        if (status != 0 || !addresses) {
+            spdlog::warn(
+                "TradeTogether could not resolve {} remote host \"{}\" on UDP {}",
+                a_fromSTR ? "STR" : "manual",
+                a_host,
+                _config.peerPort);
+            if (addresses) {
+                freeaddrinfo(addresses);
+            }
+            return false;
+        }
+
+        std::optional<sockaddr_in> resolved;
+        for (auto* item = addresses; item; item = item->ai_next) {
+            if (item->ai_family == AF_INET &&
+                item->ai_addrlen >= static_cast<int>(sizeof(sockaddr_in))) {
+                resolved = *reinterpret_cast<sockaddr_in*>(item->ai_addr);
+                break;
+            }
+        }
+        freeaddrinfo(addresses);
+
+        if (!resolved) {
+            return false;
+        }
+
+        {
+            std::scoped_lock lock(_manualPeerMutex);
+            _manualPeer = *resolved;
+            _hasManualPeer = true;
+            _manualPeerHost = std::string(a_host);
+        }
+
+        spdlog::info(
+            "TradeTogether {} remote configured: STR/manual host=\"{}\" endpoint={}",
+            a_fromSTR ? "automatic STR" : "manual",
+            a_host,
+            AddressToString(*resolved));
+        return true;
+    }
+
+    void UdpTransport::RefreshAutoRemoteFromSTR()
+    {
+        if (!_config.autoRemoteFromSTR || _config.autoDiscovery) {
+            return;
+        }
+
+        const auto host = StrServerDiscovery::ReadLastConnectedHost();
+        if (!host || host->empty()) {
+            return;
+        }
+
+        bool changed = false;
+        {
+            std::scoped_lock lock(_manualPeerMutex);
+            changed = !_hasManualPeer ||
+                      !Protocol::EqualsInsensitive(_manualPeerHost, *host);
+        }
+
+        if (changed && ConfigureManualPeer(*host, true)) {
+            SendHello();
+        }
+    }
+
+    std::optional<sockaddr_in> UdpTransport::SnapshotManualPeer()
+    {
+        std::scoped_lock lock(_manualPeerMutex);
+        if (!_hasManualPeer) {
+            return std::nullopt;
+        }
+        return _manualPeer;
     }
 
     bool UdpTransport::Start(
@@ -162,24 +264,13 @@ namespace TradeTogether
         _broadcast.sin_port = htons(_config.localPort);
         _broadcast.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 
-        _hasManualPeer = false;
+        {
+            std::scoped_lock lock(_manualPeerMutex);
+            _hasManualPeer = false;
+            _manualPeerHost.clear();
+        }
         if (!_config.autoDiscovery && !_config.peerHost.empty()) {
-            _manualPeer = {};
-            _manualPeer.sin_family = AF_INET;
-            _manualPeer.sin_port = htons(_config.peerPort);
-            _hasManualPeer = InetPtonA(
-                                 AF_INET,
-                                 _config.peerHost.c_str(),
-                                 &_manualPeer.sin_addr) == 1;
-            if (!_hasManualPeer) {
-                spdlog::error(
-                    "Manual PeerHost is not a valid IPv4 address: {}",
-                    _config.peerHost);
-                closesocket(_socket);
-                _socket = INVALID_SOCKET;
-                WSACleanup();
-                return false;
-            }
+            ConfigureManualPeer(_config.peerHost, false);
         }
 
         _instanceID = fmt::format(
@@ -192,10 +283,13 @@ namespace TradeTogether
                 ReceiverLoop();
             });
 
-        // LAN discovery broadcasts HELLO. Remote Client mode sends the same
-        // HELLO directly to the configured Host so the Host learns the real
-        // NAT source endpoint before either user starts a trade.
-        if (_config.autoDiscovery || _hasManualPeer) {
+        if (_config.autoRemoteFromSTR) {
+            RefreshAutoRemoteFromSTR();
+        }
+
+        if (_config.autoDiscovery ||
+            _config.autoRemoteFromSTR ||
+            SnapshotManualPeer().has_value()) {
             _discovery = std::jthread(
                 [this](std::stop_token a_token) {
                     DiscoveryLoop(a_token);
@@ -204,11 +298,12 @@ namespace TradeTogether
         }
 
         spdlog::info(
-            "Trade UDP started: player=\"{}\" port={} discovery={} manualPeer={} instance={}",
+            "Trade UDP started: player=\"{}\" port={} discovery={} autoRemoteFromSTR={} remoteConfigured={} instance={}",
             GetLocalPlayerName(),
             _config.localPort,
             _config.autoDiscovery ? 1 : 0,
-            _hasManualPeer ? 1 : 0,
+            _config.autoRemoteFromSTR ? 1 : 0,
+            SnapshotManualPeer().has_value() ? 1 : 0,
             _instanceID);
         return true;
     }
@@ -240,6 +335,11 @@ namespace TradeTogether
             std::scoped_lock lock(_peerMutex);
             _peers.clear();
         }
+        {
+            std::scoped_lock lock(_manualPeerMutex);
+            _hasManualPeer = false;
+            _manualPeerHost.clear();
+        }
         _handler = {};
         WSACleanup();
         spdlog::info("Trade UDP stopped");
@@ -253,8 +353,8 @@ namespace TradeTogether
 
         if (_config.autoDiscovery) {
             SendHelloTo(_broadcast);
-        } else if (_hasManualPeer) {
-            SendHelloTo(_manualPeer);
+        } else if (const auto peer = SnapshotManualPeer()) {
+            SendHelloTo(*peer);
         }
     }
 
@@ -334,10 +434,6 @@ namespace TradeTogether
                 "Trade peer discovered: player=\"{}\" address={}",
                 *name,
                 AddressToString(peerAddress));
-
-            // In remote Host mode there is no configured manual peer. Reply
-            // directly to the observed source endpoint so the Client learns
-            // the Host and both sides can initiate trades immediately.
             SendHelloTo(peerAddress);
         }
         return true;
@@ -420,16 +516,12 @@ namespace TradeTogether
             Protocol::HexEncode(GetLocalPlayerName()),
             a_payload);
 
-        std::vector<sockaddr_in> destinations;
-        if (_config.autoDiscovery) {
-            destinations = SnapshotPeers(a_playerName);
-            if (destinations.empty()) {
+        std::vector<sockaddr_in> destinations = SnapshotPeers(a_playerName);
+        if (destinations.empty()) {
+            if (_config.autoDiscovery) {
                 destinations.push_back(_broadcast);
-            }
-        } else {
-            destinations = SnapshotPeers(a_playerName);
-            if (destinations.empty() && _hasManualPeer) {
-                destinations.push_back(_manualPeer);
+            } else if (const auto peer = SnapshotManualPeer()) {
+                destinations.push_back(*peer);
             }
         }
 
@@ -473,6 +565,9 @@ namespace TradeTogether
     void UdpTransport::DiscoveryLoop(std::stop_token a_stopToken)
     {
         while (!a_stopToken.stop_requested() && _running.load()) {
+            if (_config.autoRemoteFromSTR) {
+                RefreshAutoRemoteFromSTR();
+            }
             SendHello();
             ExpirePeers();
 
@@ -491,7 +586,6 @@ namespace TradeTogether
 
     void UdpTransport::ReceiverLoop()
     {
-        // A full 24-line offer can exceed 4 KiB once item names are hex encoded.
         std::array<char, 8192> buffer{};
         while (_running.load()) {
             sockaddr_in source{};
@@ -523,8 +617,6 @@ namespace TradeTogether
                 buffer.data(),
                 static_cast<std::size_t>(received));
 
-            // HELLO is valid in both LAN and remote manual mode. In remote
-            // mode it is the NAT-friendly endpoint handshake.
             if (HandleDiscovery(packet, source)) {
                 continue;
             }
