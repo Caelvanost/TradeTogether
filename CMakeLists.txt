@@ -49,10 +49,15 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32)
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${PROJECT_SOURCES})
 
 set(PACKAGE_PLUGIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/package/Data/SKSE/Plugins")
+set(FOMOD_CORE_PLUGIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/package/00 Core/Data/SKSE/Plugins")
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${PACKAGE_PLUGIN_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${FOMOD_CORE_PLUGIN_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE:${PROJECT_NAME}>"
             "${PACKAGE_PLUGIN_DIR}/$<TARGET_FILE_NAME:${PROJECT_NAME}>"
-    COMMENT "Copying TradeTogether.dll to package/Data/SKSE/Plugins"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:${PROJECT_NAME}>"
+            "${FOMOD_CORE_PLUGIN_DIR}/$<TARGET_FILE_NAME:${PROJECT_NAME}>"
+    COMMENT "Copying TradeTogether.dll to package and FOMOD core"
 )
