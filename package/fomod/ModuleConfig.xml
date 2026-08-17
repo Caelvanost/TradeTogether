@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd">
+  <moduleName>TradeTogether Remote UDP 0.8.0</moduleName>
+  <requiredInstallFiles>
+    <folder source="00 Core" destination="" priority="0" />
+  </requiredInstallFiles>
+  <installSteps order="Explicit">
+    <installStep name="Remote network role">
+      <optionalFileGroups order="Explicit">
+        <group name="Choose this PC's role" type="SelectExactlyOne">
+          <plugins order="Explicit">
+            <plugin name="Remote Client">
+              <description>Use on the player connecting to the host. After installation, set PeerHost in Data/SKSE/Plugins/TradeTogether.ini to the host's public IPv4 address. The client normally does not need port forwarding.</description>
+              <files>
+                <folder source="10 Remote Client" destination="" priority="10" />
+              </files>
+              <typeDescriptor><type name="Recommended" /></typeDescriptor>
+            </plugin>
+            <plugin name="Remote Host">
+              <description>Use on the host PC. Forward UDP port 27993 on the router to this PC and allow UDP 27993 through Windows Firewall. PeerHost stays empty; TradeTogether learns the client's endpoint from its first packet.</description>
+              <files>
+                <folder source="20 Remote Host" destination="" priority="20" />
+              </files>
+              <typeDescriptor><type name="Optional" /></typeDescriptor>
+            </plugin>
+          </plugins>
+        </group>
+      </optionalFileGroups>
+    </installStep>
+  </installSteps>
+</config>
