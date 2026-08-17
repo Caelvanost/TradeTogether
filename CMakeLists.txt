@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(TradeTogether VERSION 0.5.4 LANGUAGES CXX)
+project(TradeTogether VERSION 0.6.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,6 +11,8 @@ find_package(CommonLibSSE REQUIRED)
 set(PROJECT_SOURCES
     src/PCH.h
     src/main.cpp
+    src/AutoTransfer.h
+    src/AutoTransfer.cpp
     src/Config.h
     src/Config.cpp
     src/Input.h
