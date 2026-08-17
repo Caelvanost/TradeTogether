@@ -78,7 +78,7 @@ namespace TradeTogether::AutoTransfer
 
         bool NamesEqual(const char* a_left, std::string_view a_right)
         {
-            return a_left && *a_left && a_left == a_right;
+            return a_left && *a_left && std::string_view(a_left) == a_right;
         }
 
         TransferPlan BuildTransferPlan(
@@ -99,50 +99,35 @@ namespace TradeTogether::AutoTransfer
 
             const auto totalCount = std::max(iterator->second.first, 0);
             auto* entry = iterator->second.second.get();
-            if (!entry) {
-                const auto* baseName = plan.object->GetName();
-                if (NamesEqual(baseName, a_line.name)) {
-                    plan.baseCount = totalCount;
-                    plan.available = totalCount;
-                }
+            if (!entry || !entry->extraLists || entry->extraLists->empty()) {
+                plan.baseCount = totalCount;
+                plan.available = totalCount;
                 return plan;
             }
 
             std::int32_t representedByExtraLists = 0;
-            if (entry->extraLists) {
-                for (auto* extraList : *entry->extraLists) {
-                    if (!extraList) {
-                        continue;
-                    }
+            for (auto* extraList : *entry->extraLists) {
+                if (!extraList) {
+                    continue;
+                }
 
-                    const auto stackCount = std::max(extraList->GetCount(), 1);
-                    representedByExtraLists += stackCount;
-                    const auto* displayName = extraList->GetDisplayName(plan.object);
-                    if (NamesEqual(displayName, a_line.name)) {
-                        plan.stacks.push_back({ extraList, stackCount });
-                        plan.available += stackCount;
-                    }
+                const auto stackCount = std::max(extraList->GetCount(), 1);
+                representedByExtraLists += stackCount;
+                const auto* displayName = extraList->GetDisplayName(plan.object);
+                if (NamesEqual(displayName, a_line.name)) {
+                    plan.stacks.push_back({ extraList, stackCount });
+                    plan.available += stackCount;
                 }
             }
 
+            // Items without per-instance data are represented by the residual
+            // count outside the extra lists. Use that base stack only when no
+            // modified instance matched the selected inventory row.
             plan.baseCount = std::max(totalCount - representedByExtraLists, 0);
-            if (plan.baseCount > 0) {
-                const auto* baseName = plan.object->GetName();
-                if (NamesEqual(baseName, a_line.name)) {
-                    plan.available += plan.baseCount;
-                } else {
-                    plan.baseCount = 0;
-                }
-            }
-
-            // Some standard stackable items have an InventoryEntryData but no
-            // per-instance extra list. In that case the menu display name is
-            // the authoritative name for the whole base stack.
-            if ((!entry->extraLists || entry->extraLists->empty()) &&
-                plan.available == 0 &&
-                NamesEqual(entry->GetDisplayName(), a_line.name)) {
-                plan.baseCount = totalCount;
-                plan.available = totalCount;
+            if (plan.stacks.empty() && plan.baseCount > 0) {
+                plan.available += plan.baseCount;
+            } else {
+                plan.baseCount = 0;
             }
 
             return plan;
