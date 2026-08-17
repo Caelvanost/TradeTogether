@@ -17,14 +17,15 @@ namespace TradeTogether
         const auto count = std::min(a_offer.size(), kMaximumOfferLines);
         for (std::size_t index = 0; index < count; ++index) {
             const auto& line = a_offer[index];
-            if (line.name.empty() || line.quantity == 0) {
+            if (line.formID == 0 || line.name.empty() || line.quantity == 0) {
                 continue;
             }
             if (!encoded.empty()) {
                 encoded.push_back(';');
             }
             encoded += fmt::format(
-                "{}:{}",
+                "{:08X}:{}:{}",
+                line.formID,
                 std::min(line.quantity, kMaximumQuantity),
                 Protocol::HexEncode(
                     std::string_view(line.name).substr(
@@ -55,28 +56,44 @@ namespace TradeTogether
                 end = a_value.size();
             }
             const auto token = a_value.substr(start, end - start);
-            const auto separator = token.find(':');
-            if (separator == std::string_view::npos) {
+            const auto firstSeparator = token.find(':');
+            if (firstSeparator == std::string_view::npos) {
+                return std::nullopt;
+            }
+            const auto secondSeparator = token.find(':', firstSeparator + 1);
+            if (secondSeparator == std::string_view::npos) {
                 return std::nullopt;
             }
 
+            RE::FormID formID = 0;
             std::uint32_t quantity = 0;
             try {
-                const auto parsed = std::stoul(
-                    std::string(token.substr(0, separator)));
-                if (parsed == 0 || parsed > kMaximumQuantity) {
+                const auto parsedFormID = std::stoul(
+                    std::string(token.substr(0, firstSeparator)),
+                    nullptr,
+                    16);
+                if (parsedFormID == 0 || parsedFormID > 0xFFFFFFFFull) {
                     return std::nullopt;
                 }
-                quantity = static_cast<std::uint32_t>(parsed);
+                formID = static_cast<RE::FormID>(parsedFormID);
+
+                const auto parsedQuantity = std::stoul(
+                    std::string(token.substr(
+                        firstSeparator + 1,
+                        secondSeparator - firstSeparator - 1)));
+                if (parsedQuantity == 0 || parsedQuantity > kMaximumQuantity) {
+                    return std::nullopt;
+                }
+                quantity = static_cast<std::uint32_t>(parsedQuantity);
             } catch (...) {
                 return std::nullopt;
             }
 
-            auto name = Protocol::HexDecode(token.substr(separator + 1));
+            auto name = Protocol::HexDecode(token.substr(secondSeparator + 1));
             if (!name || name->empty() || name->size() > kMaximumItemNameBytes) {
                 return std::nullopt;
             }
-            result.push_back(OfferLine{ 0, std::move(*name), quantity, 0 });
+            result.push_back(OfferLine{ formID, std::move(*name), quantity, 0 });
 
             if (end == a_value.size()) {
                 break;
