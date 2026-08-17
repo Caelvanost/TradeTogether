@@ -15,6 +15,8 @@ namespace TradeTogether
     private:
         static constexpr std::uint32_t kTScanCode = 0x14;
         static constexpr std::uint32_t kInsertScanCode = 0xD2;
+        static constexpr std::uint32_t kNumpadSubtractScanCode = 0x4A;
+        static constexpr std::uint32_t kNumpadAddScanCode = 0x4E;
         // Trade.cpp still uses the historical F6 scan code as its internal
         // request/validate action identifier. Input.cpp maps T to this value.
         static constexpr std::uint32_t kTradeActionCode = 0x40;
