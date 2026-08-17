@@ -1,106 +1,109 @@
-# TradeTogether v0.7.1
+# TradeTogether v0.8.0
 
-Synchronized trade-offer interface with automatic instance-aware item transfer for Skyrim Together Reborn.
-
-## Keyboard shortcut
-
-TradeTogether uses **T** to start a trade with the targeted player and to
-validate your offer during the trade.
-
-In Skyrim, **T is normally bound to Wait**. Before using TradeTogether, open
-the game controls and unbind or reassign **T** from the **Wait** command to
-avoid conflicts.
+Remote UDP edition of TradeTogether for Skyrim Together Reborn, with the same automatic instance-aware trade flow validated on the main branch.
 
 ## Trade flow
 
-1. Both players install the same version of TradeTogether and connect to
-   Skyrim Together Reborn.
-2. The requester targets the other character and presses **T**.
-3. The targeted player receives an **Accept / Refuse** prompt.
-4. After acceptance, the personal inventory opens for both players in offer
-   composition mode.
-5. Each player selects the items they want to offer:
-
-   - **Insert**: add one unit of the selected item;
+1. Both players install the same TradeTogether version and connect through Skyrim Together Reborn.
+2. The requester targets the other player and presses **T**.
+3. The other player chooses **Accept / Refuse**.
+4. Both players compose their offers in their own inventory:
+   - **Insert**: add one unit;
    - **Delete**: remove one unit;
-   - **T**: display both offers and mark yourself as ready;
-   - **Tab**: cancel the entire trade.
+   - **T**: review the offers and mark ready;
+   - **Tab**: cancel.
+5. Both players receive one final **Confirm / Modify** prompt.
+6. After both confirmations, TradeTogether performs the transfer automatically. There is no direct-inventory step and no additional user confirmation.
 
-   TradeTogether deliberately avoids **E** because Skyrim uses it to consume or
-   activate inventory items, and avoids **A** because Skyrim uses it for
-   inventory favorites by default.
+TradeTogether deliberately does not intercept **E** (normal inventory action) or **A** (favorites).
 
-6. Any offer change automatically clears the ready state.
-7. When both players are ready, each player sees both baskets and confirms one
-   final time.
-8. After both confirmations, TradeTogether performs an invisible preflight and
-   automatically transfers the offered items. No direct inventory is opened and
-   there are no additional confirmation steps.
+## Instance-aware transfer
 
-Quest items are rejected. An offer can contain up to 24 lines and may be empty,
-allowing one-way gifts. The initial request expires after 30 seconds, and an
-inactive session expires after 5 minutes.
+TradeTogether transfers the actual local Skyrim inventory instance through the native container transfer path. When an item has an `ExtraDataList`, that exact list is passed to `RemoveItem` with the other player's STR proxy as the destination.
 
-## Native instance-aware transfer
-
-v0.7.x no longer recreates received equipment from only its base FormID.
-Instead, each client transfers the exact local inventory stack to Skyrim
-Together Reborn's proxy of the other player using Skyrim's native container
-transfer path.
-
-When an item has an `ExtraDataList`, that exact list is supplied to
-`RemoveItem`. The instance data therefore travels with the object rather than
-being discarded and rebuilt from the base form. This is intended to preserve,
-in particular:
+This is designed to preserve instance data such as:
 
 - smithing / tempering improvements;
-- custom or extra enchantments;
-- enchantment charge;
+- enchantments and enchantment charge;
 - custom item names;
-- other per-instance data carried by Skyrim's native extra-data list.
+- other per-instance extra data.
 
-Standard stackable objects without per-instance data are still transferred as
-normal base stacks.
+Standard stackable items are transferred normally as base stacks.
 
-TradeTogether identifies the active peer from the most recent trade-network
-packet, resolves the corresponding high-process actor by character name, and
-uses that STR proxy as the native transfer destination. The synchronized offer
-payload still carries FormID, quantity and display name for validation and UI;
-it is no longer used to reconstruct modified equipment on the receiving side.
+The v0.7.1 core was validated in game with both a forged/improved dagger and a standard amethyst before being integrated into this remote branch.
 
-### v0.7.1
+## Remote UDP mode
 
-Fixes compatibility with CommonLibSSE-NG 3.5.2 by using the `Actor&` callback
-signature required by `ProcessLists::ForEachHighActor`.
+TradeTogether uses **UDP port 27993** independently of Skyrim Together Reborn.
 
-### Current limitation
+### Remote Host
 
-The transfer depends on Skyrim Together Reborn synchronizing the same native
-container operation used by direct inventory transfers. This architecture is
-specifically intended to preserve instance data instead of attempting to clone
-Skyrim's temporary enchantment forms ourselves.
+Choose **Remote Host** in the FOMOD.
 
-If two different instances have the same base FormID **and the exact same
-display name**, Skyrim's inventory UI may not give TradeTogether enough visible
-information to distinguish which one was intended. The mod prefers matching
-`ExtraDataList` stacks before falling back to an unmodified base stack.
+The host configuration uses:
 
-## Network
+```ini
+AutoDiscovery=0
+LocalPort=27993
+PeerHost=
+PeerPort=27993
+```
 
-TradeTogether uses an independent UDP channel on port **27993**. Discovery is
-automatic on a local network. Both players must allow Skyrim through their
-private-network firewall.
+On the host network:
 
-For a connection without LAN discovery, set `AutoDiscovery=0`, `PeerHost`, and
-`PeerPort` in `Data/SKSE/Plugins/TradeTogether.ini`. UDP port forwarding may be
-required depending on the router.
+1. Forward **UDP 27993** on the router to the host PC's local IPv4 address.
+2. Allow UDP 27993 through Windows Firewall for Skyrim / TradeTogether.
+3. Leave `PeerHost` empty.
 
-Players are associated by their character name. The initial target may be any
-`Actor` other than the local player because STR does not expose a stable public
-SKSE API for formally identifying its remote actors.
+The host does not need to know the client's public IP. When the first gameplay packet arrives, TradeTogether records the client's real UDP source endpoint and uses it for subsequent replies.
 
-The log is located at:
-`Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log`.
+### Remote Client
+
+Choose **Remote Client** in the FOMOD.
+
+After installation, edit:
+
+```text
+Data/SKSE/Plugins/TradeTogether.ini
+```
+
+and set:
+
+```ini
+AutoDiscovery=0
+PeerHost=<HOST_PUBLIC_IPV4>
+PeerPort=27993
+```
+
+Example:
+
+```ini
+PeerHost=203.0.113.42
+PeerPort=27993
+```
+
+The client normally does **not** need a router port-forward rule. Its initial outbound UDP packet creates the NAT mapping; the host replies to the source endpoint it learned from that packet.
+
+`PeerHost` currently expects an IPv4 address, not a DNS hostname.
+
+## LAN mode
+
+For LAN use, the regular `main` branch remains simpler. Its default configuration uses automatic broadcast discovery. The `udp` branch is intended for remote Internet testing.
+
+## Current limitations
+
+- Both players must use matching TradeTogether builds.
+- The target player must be represented by a loaded/high-process STR actor proxy so the native item transfer has a destination.
+- If two modified instances have the same base FormID and exactly the same display name, Skyrim's inventory representation may not expose enough information to distinguish them perfectly.
+- Remote connectivity can be blocked by CGNAT or restrictive firewalls even when the local configuration is correct. In that case a conventional router port forward may not be possible without a public IPv4 address or VPN/tunnel solution.
+
+## Log
+
+```text
+Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
+```
+
+Useful remote-network log entries include the UDP startup line, learned peer addresses, sent packet counts and native instance-transfer entries.
 
 ## Build
 
@@ -108,9 +111,10 @@ The log is located at:
 .\build_release.bat
 ```
 
-The script builds the DLL, copies it together with the INI into the package,
-and creates:
+Expected archive:
 
 ```text
-dist/TradeTogether-v0.7.1-Vortex.zip
+dist/TradeTogether-v0.8.0-Vortex.zip
 ```
+
+The archive contains the FOMOD installer with **Remote Client** and **Remote Host** profiles.
