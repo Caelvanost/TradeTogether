@@ -1,6 +1,6 @@
-# TradeTogether v0.8.1-udp
+# TradeTogether v0.8.2-udp
 
-Remote UDP edition of TradeTogether for Skyrim Together Reborn. It contains the same validated item and gold trading core as `main` v0.8.1, plus automatic remote-client discovery of the STR server address and Host/Client FOMOD profiles.
+Remote UDP edition of TradeTogether for Skyrim Together Reborn. It contains the same validated item and gold trading core as `main` v0.8.2, plus automatic remote-client discovery of the STR server address and Host/Client FOMOD profiles.
 
 ## Trade flow
 
@@ -19,6 +19,10 @@ Remote UDP edition of TradeTogether for Skyrim Together Reborn. It contains the 
 6. After both confirmations, TradeTogether transfers the items and gold automatically.
 
 Any item or gold change clears the Ready state. There is no direct-inventory step and no additional user confirmation. TradeTogether deliberately does not intercept **E** or **A**.
+
+## English UI
+
+Starting with **v0.8.2-udp**, all user-facing TradeTogether notifications, trade summaries, validation errors, prompts and MessageBox buttons are displayed in English for the public Nexus Mods release.
 
 ## Gold trading
 
@@ -107,11 +111,11 @@ For LAN use, the regular `main` branch remains simpler and uses automatic broadc
 The functional version follows `main`. The remote branch appends `-udp` to make its build unambiguous:
 
 ```text
-main: v0.8.1
-udp:  v0.8.1-udp
+main: v0.8.2
+udp:  v0.8.2-udp
 ```
 
-CMake's `project(... VERSION ...)` field must remain numeric, so it stays `0.8.1`; `TRADETOGETHER_RELEASE_VERSION`, runtime logs, FOMOD metadata and deployment archive use `0.8.1-udp`.
+CMake's `project(... VERSION ...)` field must remain numeric, so it stays `0.8.2`; `TRADETOGETHER_RELEASE_VERSION`, runtime logs, FOMOD metadata and deployment archive use `0.8.2-udp`.
 
 ## Log
 
@@ -130,7 +134,7 @@ Useful entries include gold key presses, `automatic STR remote configured`, disc
 Expected archive:
 
 ```text
-dist/TradeTogether-v0.8.1-udp-Vortex.zip
+dist/TradeTogether-v0.8.2-udp-Vortex.zip
 ```
 
 The archive contains the FOMOD installer with **Remote Client** and **Remote Host** profiles.
