@@ -1,19 +1,14 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.7.1"
+    [string]$Version = "0.8.0"
 )
 
 $ErrorActionPreference = "Stop"
 
-# If no project root is explicitly supplied, derive it from this script's
-# location: <project>\tools\make_vortex_archive.ps1 -> <project>.
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent $PSScriptRoot
 }
 
-# Normalize paths. In particular, avoid passing "%~dp0" from cmd.exe: its
-# trailing backslash can interact badly with the closing quote and produce an
-# invalid Windows path such as ...\TradeTogether.dll\".
 $ProjectRoot = $ProjectRoot.Trim().Trim('"')
 while ($ProjectRoot.EndsWith('\') -or $ProjectRoot.EndsWith('/')) {
     $ProjectRoot = $ProjectRoot.Substring(0, $ProjectRoot.Length - 1)
@@ -24,14 +19,18 @@ $packageDir = Join-Path $ProjectRoot "package"
 $pluginDir = Join-Path $packageDir "Data\SKSE\Plugins"
 $dllPath = Join-Path $pluginDir "TradeTogether.dll"
 $iniPath = Join-Path $pluginDir "TradeTogether.ini"
+$fomodConfig = Join-Path $packageDir "fomod\ModuleConfig.xml"
+$fomodInfo = Join-Path $packageDir "fomod\info.xml"
+$fomodCoreDll = Join-Path $packageDir "00 Core\Data\SKSE\Plugins\TradeTogether.dll"
+$clientIni = Join-Path $packageDir "10 Remote Client\Data\SKSE\Plugins\TradeTogether.ini"
+$hostIni = Join-Path $packageDir "20 Remote Host\Data\SKSE\Plugins\TradeTogether.ini"
 $distDir = Join-Path $ProjectRoot "dist"
 $archivePath = Join-Path $distDir ("TradeTogether-v{0}-Vortex.zip" -f $Version)
 
-if (-not (Test-Path -LiteralPath $dllPath -PathType Leaf)) {
-    throw "DLL introuvable: $dllPath. Compile d'abord avec build_release.bat."
-}
-if (-not (Test-Path -LiteralPath $iniPath -PathType Leaf)) {
-    throw "INI introuvable: $iniPath"
+foreach ($requiredFile in @($dllPath, $iniPath, $fomodConfig, $fomodInfo, $fomodCoreDll, $clientIni, $hostIni)) {
+    if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
+        throw "Fichier de package introuvable: $requiredFile. Compile d'abord avec build_release.bat."
+    }
 }
 
 New-Item -ItemType Directory -Path $distDir -Force | Out-Null
@@ -46,5 +45,6 @@ Compress-Archive `
     -CompressionLevel Optimal `
     -Force
 
-Write-Host "[TradeTogether] Archive Vortex creee:" -ForegroundColor Green
+Write-Host "[TradeTogether] Archive Vortex/FOMOD creee:" -ForegroundColor Green
 Write-Host "  $archivePath"
+Write-Host "  Profils: Remote Client / Remote Host"
