@@ -53,15 +53,15 @@ namespace TradeTogether::AutoTransfer
 
             RE::Actor* result = nullptr;
             processLists->ForEachHighActor(
-                [&](RE::Actor* a_actor) {
-                    if (!a_actor || a_actor == a_player) {
+                [&](RE::Actor& a_actor) {
+                    if (std::addressof(a_actor) == a_player) {
                         return RE::BSContainer::ForEachResult::kContinue;
                     }
 
-                    const auto actorName = GetActorName(a_actor);
+                    const auto actorName = GetActorName(std::addressof(a_actor));
                     if (!actorName.empty() &&
                         Protocol::EqualsInsensitive(actorName, *peerName)) {
-                        result = a_actor;
+                        result = std::addressof(a_actor);
                         return RE::BSContainer::ForEachResult::kStop;
                     }
                     return RE::BSContainer::ForEachResult::kContinue;
