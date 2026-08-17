@@ -1,4 +1,4 @@
-# TradeTogether v0.8.1
+# TradeTogether v0.8.2
 
 Synchronized trade-offer interface with automatic instance-aware item and gold transfer for Skyrim Together Reborn.
 
@@ -33,6 +33,10 @@ In Skyrim, **T is normally bound to Wait**. Before using TradeTogether, unbind o
 Quest items are rejected. Gold is managed separately from normal item lines, so the Gold inventory entry cannot be added with Insert. An offer can contain up to 24 item lines and may contain only gold or even be empty, allowing one-way gifts.
 
 The initial request expires after 30 seconds, and an inactive session expires after 5 minutes.
+
+## English UI
+
+Starting with **v0.8.2**, user-facing TradeTogether notifications, trade summaries, prompts, validation errors and MessageBox buttons are displayed in English for the public Nexus Mods release. Internal protocol behavior is unchanged.
 
 ## Gold trading
 
@@ -88,5 +92,5 @@ The log is located at:
 The script builds the DLL, copies it together with the INI into the package, and creates:
 
 ```text
-dist/TradeTogether-v0.8.1-Vortex.zip
+dist/TradeTogether-v0.8.2-Vortex.zip
 ```
