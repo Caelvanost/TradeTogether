@@ -20,6 +20,21 @@ namespace TradeTogether::AutoTransfer
             const auto iterator = counts.find(a_object);
             return iterator != counts.end() ? iterator->second : 0;
         }
+
+        bool ValidateRemoteOffer(const Offer& a_offer, std::string& a_error)
+        {
+            for (const auto& line : a_offer) {
+                if (line.formID == 0 || line.quantity == 0) {
+                    a_error = "offre distante invalide";
+                    return false;
+                }
+                if (!LookupObject(line.formID)) {
+                    a_error = fmt::format("objet distant introuvable: {}", line.name);
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     bool ValidateLocalOffer(
@@ -64,19 +79,18 @@ namespace TradeTogether::AutoTransfer
         const Offer& a_remoteOffer,
         std::string& a_error)
     {
-        if (!ValidateLocalOffer(a_player, a_localOffer, a_error)) {
+        // Validate everything we can before touching the inventory. The
+        // protocol has already received both users' final confirmations; this
+        // is an invisible safety preflight rather than another UI step.
+        if (!ValidateLocalOffer(a_player, a_localOffer, a_error) ||
+            !ValidateRemoteOffer(a_remoteOffer, a_error)) {
             return false;
         }
 
         // Each client only mutates its own real PlayerCharacter. This avoids
-        // relying on the remote STR proxy for the actual transaction.
+        // relying on STR's remote actor proxy for the actual transaction.
         for (const auto& line : a_localOffer) {
             auto* object = LookupObject(line.formID);
-            if (!object) {
-                a_error = fmt::format("objet local introuvable: {}", line.name);
-                return false;
-            }
-
             a_player->RemoveItem(
                 object,
                 static_cast<std::int32_t>(line.quantity),
@@ -87,11 +101,6 @@ namespace TradeTogether::AutoTransfer
 
         for (const auto& line : a_remoteOffer) {
             auto* object = LookupObject(line.formID);
-            if (!object) {
-                a_error = fmt::format("objet distant introuvable: {}", line.name);
-                return false;
-            }
-
             a_player->AddObjectToContainer(
                 object,
                 nullptr,
