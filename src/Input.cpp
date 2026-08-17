@@ -20,7 +20,7 @@ namespace TradeTogether
 
         inputManager->AddEventSink(GetSingleton());
         spdlog::info(
-            "Input event sink registered (T=request/validate, Insert=add, Delete=remove, Tab=cancel)");
+            "Input event sink registered (T=request/validate, Insert=add, Delete=remove, Numpad +/-=gold, Tab=cancel)");
     }
 
     RE::BSEventNotifyControl InputEventSink::ProcessEvent(
@@ -53,6 +53,21 @@ namespace TradeTogether
             if (scanCode == kInsertScanCode) {
                 spdlog::debug("Trade add key pressed: Insert / DIK 0x{:02X}", scanCode);
                 Trade::HandleKey(kAddActionCode);
+                break;
+            }
+
+            if (scanCode == kNumpadAddScanCode ||
+                scanCode == kNumpadSubtractScanCode) {
+                const bool control = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+                const bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+                const std::int32_t step = control ? 100 : (shift ? 10 : 1);
+                const std::int32_t delta =
+                    scanCode == kNumpadAddScanCode ? step : -step;
+                spdlog::debug(
+                    "Trade gold key pressed: DIK 0x{:02X} delta={}",
+                    scanCode,
+                    delta);
+                Trade::AdjustGold(delta);
                 break;
             }
 
