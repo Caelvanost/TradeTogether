@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(TradeTogether VERSION 0.8.1 LANGUAGES CXX)
+set(TRADETOGETHER_RELEASE_VERSION "${PROJECT_VERSION}-udp")
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -61,5 +62,5 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE:${PROJECT_NAME}>"
             "${FOMOD_CORE_PLUGIN_DIR}/$<TARGET_FILE_NAME:${PROJECT_NAME}>"
-    COMMENT "Copying TradeTogether.dll to package and FOMOD core"
+    COMMENT "Copying TradeTogether.dll to package and FOMOD core (${TRADETOGETHER_RELEASE_VERSION})"
 )
