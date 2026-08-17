@@ -1,37 +1,175 @@
 #include "PCH.h"
 #include "AutoTransfer.h"
+#include "Protocol.h"
+#include "UdpTransport.h"
 
 namespace TradeTogether::AutoTransfer
 {
     namespace
     {
+        struct StackMatch
+        {
+            RE::ExtraDataList* extraList{ nullptr };
+            std::int32_t count{ 0 };
+        };
+
+        struct TransferPlan
+        {
+            RE::TESBoundObject* object{ nullptr };
+            std::vector<StackMatch> stacks;
+            std::int32_t baseCount{ 0 };
+            std::int32_t available{ 0 };
+        };
+
         RE::TESBoundObject* LookupObject(RE::FormID a_formID)
         {
             return RE::TESForm::LookupByID<RE::TESBoundObject>(a_formID);
         }
 
-        std::int32_t GetCount(RE::PlayerCharacter* a_player, RE::TESBoundObject* a_object)
+        std::string GetActorName(RE::Actor* a_actor)
         {
-            if (!a_player || !a_object) {
-                return 0;
+            if (!a_actor) {
+                return {};
             }
 
-            const auto counts = a_player->GetInventoryCounts();
-            const auto iterator = counts.find(a_object);
-            return iterator != counts.end() ? iterator->second : 0;
+            const auto* name = a_actor->GetDisplayFullName();
+            if (!name || !*name) {
+                name = a_actor->GetName();
+            }
+            return name && *name ? name : std::string{};
         }
 
-        bool ValidateRemoteOffer(const Offer& a_offer, std::string& a_error)
+        RE::Actor* ResolveMostRecentPeerActor(RE::PlayerCharacter* a_player)
         {
-            for (const auto& line : a_offer) {
-                if (line.formID == 0 || line.quantity == 0) {
-                    a_error = "offre distante invalide";
-                    return false;
+            const auto peerName = UdpTransport::GetSingleton().GetMostRecentPeerName();
+            if (!peerName || peerName->empty()) {
+                return nullptr;
+            }
+
+            auto* processLists = RE::ProcessLists::GetSingleton();
+            if (!processLists) {
+                return nullptr;
+            }
+
+            RE::Actor* result = nullptr;
+            processLists->ForEachHighActor(
+                [&](RE::Actor* a_actor) {
+                    if (!a_actor || a_actor == a_player) {
+                        return RE::BSContainer::ForEachResult::kContinue;
+                    }
+
+                    const auto actorName = GetActorName(a_actor);
+                    if (!actorName.empty() &&
+                        Protocol::EqualsInsensitive(actorName, *peerName)) {
+                        result = a_actor;
+                        return RE::BSContainer::ForEachResult::kStop;
+                    }
+                    return RE::BSContainer::ForEachResult::kContinue;
+                });
+
+            if (result) {
+                spdlog::debug(
+                    "Resolved native transfer peer: player=\"{}\" actor={:08X}",
+                    *peerName,
+                    result->GetFormID());
+            }
+            return result;
+        }
+
+        bool NamesEqual(const char* a_left, std::string_view a_right)
+        {
+            return a_left && *a_left && a_left == a_right;
+        }
+
+        TransferPlan BuildTransferPlan(
+            RE::PlayerCharacter* a_player,
+            const OfferLine& a_line)
+        {
+            TransferPlan plan{};
+            plan.object = LookupObject(a_line.formID);
+            if (!a_player || !plan.object) {
+                return plan;
+            }
+
+            const auto inventory = a_player->GetInventory();
+            const auto iterator = inventory.find(plan.object);
+            if (iterator == inventory.end()) {
+                return plan;
+            }
+
+            const auto totalCount = std::max(iterator->second.first, 0);
+            auto* entry = iterator->second.second.get();
+            if (!entry) {
+                const auto* baseName = plan.object->GetName();
+                if (NamesEqual(baseName, a_line.name)) {
+                    plan.baseCount = totalCount;
+                    plan.available = totalCount;
                 }
-                if (!LookupObject(line.formID)) {
-                    a_error = fmt::format("objet distant introuvable: {}", line.name);
-                    return false;
+                return plan;
+            }
+
+            std::int32_t representedByExtraLists = 0;
+            if (entry->extraLists) {
+                for (auto* extraList : *entry->extraLists) {
+                    if (!extraList) {
+                        continue;
+                    }
+
+                    const auto stackCount = std::max(extraList->GetCount(), 1);
+                    representedByExtraLists += stackCount;
+                    const auto* displayName = extraList->GetDisplayName(plan.object);
+                    if (NamesEqual(displayName, a_line.name)) {
+                        plan.stacks.push_back({ extraList, stackCount });
+                        plan.available += stackCount;
+                    }
                 }
+            }
+
+            plan.baseCount = std::max(totalCount - representedByExtraLists, 0);
+            if (plan.baseCount > 0) {
+                const auto* baseName = plan.object->GetName();
+                if (NamesEqual(baseName, a_line.name)) {
+                    plan.available += plan.baseCount;
+                } else {
+                    plan.baseCount = 0;
+                }
+            }
+
+            // Some standard stackable items have an InventoryEntryData but no
+            // per-instance extra list. In that case the menu display name is
+            // the authoritative name for the whole base stack.
+            if ((!entry->extraLists || entry->extraLists->empty()) &&
+                plan.available == 0 &&
+                NamesEqual(entry->GetDisplayName(), a_line.name)) {
+                plan.baseCount = totalCount;
+                plan.available = totalCount;
+            }
+
+            return plan;
+        }
+
+        bool ValidateLine(
+            RE::PlayerCharacter* a_player,
+            const OfferLine& a_line,
+            std::string& a_error)
+        {
+            if (a_line.formID == 0 || a_line.quantity == 0 || a_line.name.empty()) {
+                a_error = "offre locale invalide";
+                return false;
+            }
+
+            const auto plan = BuildTransferPlan(a_player, a_line);
+            if (!plan.object) {
+                a_error = fmt::format("objet introuvable: {}", a_line.name);
+                return false;
+            }
+            if (plan.available < static_cast<std::int32_t>(a_line.quantity)) {
+                a_error = fmt::format(
+                    "instance indisponible pour {} ({} disponible, {} requis)",
+                    a_line.name,
+                    plan.available,
+                    a_line.quantity);
+                return false;
             }
             return true;
         }
@@ -48,64 +186,91 @@ namespace TradeTogether::AutoTransfer
         }
 
         for (const auto& line : a_offer) {
-            if (line.formID == 0 || line.quantity == 0) {
-                a_error = "offre locale invalide";
-                return false;
-            }
-
-            auto* object = LookupObject(line.formID);
-            if (!object) {
-                a_error = fmt::format("objet introuvable: {}", line.name);
-                return false;
-            }
-
-            const auto count = GetCount(a_player, object);
-            if (count < static_cast<std::int32_t>(line.quantity)) {
-                a_error = fmt::format(
-                    "quantite insuffisante pour {} ({} disponible, {} requis)",
-                    line.name,
-                    count,
-                    line.quantity);
+            if (!ValidateLine(a_player, line, a_error)) {
                 return false;
             }
         }
-
         return true;
     }
 
     bool ExecuteLocalExchange(
         RE::PlayerCharacter* a_player,
         const Offer& a_localOffer,
-        const Offer& a_remoteOffer,
+        const Offer&,
         std::string& a_error)
     {
-        // Validate everything we can before touching the inventory. The
-        // protocol has already received both users' final confirmations; this
-        // is an invisible safety preflight rather than another UI step.
-        if (!ValidateLocalOffer(a_player, a_localOffer, a_error) ||
-            !ValidateRemoteOffer(a_remoteOffer, a_error)) {
+        // Validate every local line before touching the inventory. No extra UI
+        // is shown: this remains an invisible preflight after final confirmation.
+        if (!ValidateLocalOffer(a_player, a_localOffer, a_error)) {
             return false;
         }
 
-        // Each client only mutates its own real PlayerCharacter. This avoids
-        // relying on STR's remote actor proxy for the actual transaction.
-        for (const auto& line : a_localOffer) {
-            auto* object = LookupObject(line.formID);
-            a_player->RemoveItem(
-                object,
-                static_cast<std::int32_t>(line.quantity),
-                RE::ITEM_REMOVE_REASON::kRemove,
-                nullptr,
-                nullptr);
+        if (a_localOffer.empty()) {
+            return true;
         }
 
-        for (const auto& line : a_remoteOffer) {
-            auto* object = LookupObject(line.formID);
-            a_player->AddObjectToContainer(
-                object,
-                nullptr,
-                static_cast<std::int32_t>(line.quantity),
-                nullptr);
+        auto* peerActor = ResolveMostRecentPeerActor(a_player);
+        if (!peerActor) {
+            a_error = "proxy du partenaire introuvable";
+            return false;
+        }
+
+        // Move the exact local inventory stacks to STR's remote actor proxy.
+        // Passing the original ExtraDataList makes Skyrim move the actual item
+        // instance instead of recreating it from the base FormID. Tempering,
+        // custom names, enchantments and charge therefore stay attached to the
+        // instance and STR can synchronize the same native container transfer.
+        for (const auto& line : a_localOffer) {
+            auto plan = BuildTransferPlan(a_player, line);
+            auto remaining = static_cast<std::int32_t>(line.quantity);
+
+            for (const auto& stack : plan.stacks) {
+                if (remaining <= 0) {
+                    break;
+                }
+
+                const auto count = std::min(remaining, stack.count);
+                a_player->RemoveItem(
+                    plan.object,
+                    count,
+                    RE::ITEM_REMOVE_REASON::kStoreInTeammate,
+                    stack.extraList,
+                    peerActor);
+                remaining -= count;
+
+                spdlog::info(
+                    "Native instance transfer: form={:08X} name=\"{}\" count={} extra=1 peer={:08X}",
+                    line.formID,
+                    line.name,
+                    count,
+                    peerActor->GetFormID());
+            }
+
+            if (remaining > 0 && plan.baseCount > 0) {
+                const auto count = std::min(remaining, plan.baseCount);
+                a_player->RemoveItem(
+                    plan.object,
+                    count,
+                    RE::ITEM_REMOVE_REASON::kStoreInTeammate,
+                    nullptr,
+                    peerActor);
+                remaining -= count;
+
+                spdlog::info(
+                    "Native instance transfer: form={:08X} name=\"{}\" count={} extra=0 peer={:08X}",
+                    line.formID,
+                    line.name,
+                    count,
+                    peerActor->GetFormID());
+            }
+
+            if (remaining > 0) {
+                a_error = fmt::format(
+                    "transfert incomplet pour {} ({} restant)",
+                    line.name,
+                    remaining);
+                return false;
+            }
         }
 
         return true;
