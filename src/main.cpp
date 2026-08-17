@@ -31,7 +31,7 @@ namespace
             TradeTogether::InputEventSink::GetSingleton()->Register();
             const auto networkReady = TradeTogether::Trade::Initialize();
             spdlog::info(
-                "TradeTogether v0.8.0 ready - remote UDP native instance-aware transfer network={}",
+                "TradeTogether v0.8.1 ready - remote UDP with STR auto remote discovery and native instance-aware transfer network={}",
                 networkReady ? "ready" : "unavailable");
         } else if (
             a_message->type == SKSE::MessagingInterface::kPreLoadGame ||
@@ -46,7 +46,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
     SKSE::Init(a_skse);
     SetupLog();
 
-    spdlog::info("TradeTogether v0.8.0 loading");
+    spdlog::info("TradeTogether v0.8.1 loading");
 
     auto* messaging = SKSE::GetMessagingInterface();
     if (!messaging) {
