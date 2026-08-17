@@ -191,7 +191,11 @@ namespace TradeTogether
             [this](std::stop_token) {
                 ReceiverLoop();
             });
-        if (_config.autoDiscovery) {
+
+        // LAN discovery broadcasts HELLO. Remote Client mode sends the same
+        // HELLO directly to the configured Host so the Host learns the real
+        // NAT source endpoint before either user starts a trade.
+        if (_config.autoDiscovery || _hasManualPeer) {
             _discovery = std::jthread(
                 [this](std::stop_token a_token) {
                     DiscoveryLoop(a_token);
@@ -243,8 +247,14 @@ namespace TradeTogether
 
     void UdpTransport::SendHello()
     {
-        if (_running.load() && _config.autoDiscovery) {
+        if (!_running.load()) {
+            return;
+        }
+
+        if (_config.autoDiscovery) {
             SendHelloTo(_broadcast);
+        } else if (_hasManualPeer) {
+            SendHelloTo(_manualPeer);
         }
     }
 
@@ -297,7 +307,13 @@ namespace TradeTogether
         }
 
         auto peerAddress = a_source;
-        peerAddress.sin_port = htons(*port);
+        // On LAN, the advertised listening port is authoritative. Across NAT,
+        // the observed source port is authoritative because the router may
+        // have rewritten the client's local port.
+        if (_config.autoDiscovery) {
+            peerAddress.sin_port = htons(*port);
+        }
+
         const auto key = fmt::format(
             "{}|{}",
             *id,
@@ -318,6 +334,10 @@ namespace TradeTogether
                 "Trade peer discovered: player=\"{}\" address={}",
                 *name,
                 AddressToString(peerAddress));
+
+            // In remote Host mode there is no configured manual peer. Reply
+            // directly to the observed source endpoint so the Client learns
+            // the Host and both sides can initiate trades immediately.
             SendHelloTo(peerAddress);
         }
         return true;
@@ -407,10 +427,6 @@ namespace TradeTogether
                 destinations.push_back(_broadcast);
             }
         } else {
-            // Remote mode: the client starts with the host's public endpoint.
-            // The host has no configured PeerHost; after receiving the first
-            // gameplay packet it learns the client's real source endpoint in
-            // TouchGameplayPeer() and can reply to that learned peer.
             destinations = SnapshotPeers(a_playerName);
             if (destinations.empty() && _hasManualPeer) {
                 destinations.push_back(_manualPeer);
@@ -506,7 +522,10 @@ namespace TradeTogether
             const std::string packet(
                 buffer.data(),
                 static_cast<std::size_t>(received));
-            if (_config.autoDiscovery && HandleDiscovery(packet, source)) {
+
+            // HELLO is valid in both LAN and remote manual mode. In remote
+            // mode it is the NAT-friendly endpoint handshake.
+            if (HandleDiscovery(packet, source)) {
                 continue;
             }
             if (!packet.starts_with(kGameplayPrefix)) {
