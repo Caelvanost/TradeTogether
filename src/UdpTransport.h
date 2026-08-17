@@ -28,6 +28,7 @@ namespace TradeTogether
         }
 
         [[nodiscard]] std::string GetLocalPlayerName() const;
+        [[nodiscard]] std::optional<std::string> GetMostRecentPeerName();
 
     private:
         struct Peer
