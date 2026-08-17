@@ -1,4 +1,4 @@
-# TradeTogether v0.7.0
+# TradeTogether v0.7.1
 
 Synchronized trade-offer interface with automatic instance-aware item transfer for Skyrim Together Reborn.
 
@@ -43,7 +43,7 @@ inactive session expires after 5 minutes.
 
 ## Native instance-aware transfer
 
-v0.7.0 no longer recreates received equipment from only its base FormID.
+v0.7.x no longer recreates received equipment from only its base FormID.
 Instead, each client transfers the exact local inventory stack to Skyrim
 Together Reborn's proxy of the other player using Skyrim's native container
 transfer path.
@@ -67,6 +67,11 @@ packet, resolves the corresponding high-process actor by character name, and
 uses that STR proxy as the native transfer destination. The synchronized offer
 payload still carries FormID, quantity and display name for validation and UI;
 it is no longer used to reconstruct modified equipment on the receiving side.
+
+### v0.7.1
+
+Fixes compatibility with CommonLibSSE-NG 3.5.2 by using the `Actor&` callback
+signature required by `ProcessLists::ForEachHighActor`.
 
 ### Current limitation
 
@@ -107,5 +112,5 @@ The script builds the DLL, copies it together with the INI into the package,
 and creates:
 
 ```text
-dist/TradeTogether-v0.7.0-Vortex.zip
+dist/TradeTogether-v0.7.1-Vortex.zip
 ```
