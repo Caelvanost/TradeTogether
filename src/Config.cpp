@@ -98,6 +98,8 @@ namespace TradeTogether
             !ReadBool(L"Network", L"Disabled", false);
         config.autoDiscovery =
             ReadBool(L"Network", L"AutoDiscovery", config.autoDiscovery);
+        config.autoRemoteFromSTR =
+            ReadBool(L"Network", L"AutoRemoteFromSTR", config.autoRemoteFromSTR);
         config.localPort =
             ReadPort(L"LocalPort", config.localPort);
         config.peerPort =
