@@ -31,7 +31,7 @@ namespace
             TradeTogether::InputEventSink::GetSingleton()->Register();
             const auto networkReady = TradeTogether::Trade::Initialize();
             spdlog::info(
-                "TradeTogether v0.8.1 ready - item and gold trading network={}",
+                "TradeTogether v0.8.2 ready - item and gold trading with English UI network={}",
                 networkReady ? "ready" : "unavailable");
         } else if (
             a_message->type == SKSE::MessagingInterface::kPreLoadGame ||
@@ -46,7 +46,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
     SKSE::Init(a_skse);
     SetupLog();
 
-    spdlog::info("TradeTogether v0.8.1 loading");
+    spdlog::info("TradeTogether v0.8.2 loading");
 
     auto* messaging = SKSE::GetMessagingInterface();
     if (!messaging) {
