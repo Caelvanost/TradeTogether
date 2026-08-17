@@ -29,6 +29,34 @@ namespace TradeTogether
     {
         Trade::Update();
 
+        // SkyUI / InventoryMenu does not consistently expose the numpad +/-
+        // keys through ButtonEvent::GetIDCode(). Read their physical Windows
+        // virtual-key state directly and trigger only on the transition from
+        // released to pressed. Release events still pass through this sink, so
+        // the latch is reset without generating repeated gold changes.
+        static bool addWasDown = false;
+        static bool subtractWasDown = false;
+
+        const bool addDown = (GetAsyncKeyState(VK_ADD) & 0x8000) != 0;
+        const bool subtractDown = (GetAsyncKeyState(VK_SUBTRACT) & 0x8000) != 0;
+
+        if ((addDown && !addWasDown) ||
+            (subtractDown && !subtractWasDown)) {
+            const bool control = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+            const bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+            const std::int32_t step = control ? 100 : (shift ? 10 : 1);
+            const std::int32_t delta = addDown && !addWasDown ? step : -step;
+
+            spdlog::info(
+                "Trade gold key pressed: source=Win32 key={} delta={}",
+                delta > 0 ? "VK_ADD" : "VK_SUBTRACT",
+                delta);
+            Trade::AdjustGold(delta);
+        }
+
+        addWasDown = addDown;
+        subtractWasDown = subtractDown;
+
         if (!a_event) {
             return RE::BSEventNotifyControl::kContinue;
         }
@@ -53,21 +81,6 @@ namespace TradeTogether
             if (scanCode == kInsertScanCode) {
                 spdlog::debug("Trade add key pressed: Insert / DIK 0x{:02X}", scanCode);
                 Trade::HandleKey(kAddActionCode);
-                break;
-            }
-
-            if (scanCode == kNumpadAddScanCode ||
-                scanCode == kNumpadSubtractScanCode) {
-                const bool control = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
-                const bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
-                const std::int32_t step = control ? 100 : (shift ? 10 : 1);
-                const std::int32_t delta =
-                    scanCode == kNumpadAddScanCode ? step : -step;
-                spdlog::debug(
-                    "Trade gold key pressed: DIK 0x{:02X} delta={}",
-                    scanCode,
-                    delta);
-                Trade::AdjustGold(delta);
                 break;
             }
 
