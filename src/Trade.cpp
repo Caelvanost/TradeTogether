@@ -1,5 +1,6 @@
 #include "PCH.h"
 #include "Trade.h"
+#include "AutoTransfer.h"
 #include "Config.h"
 #include "Offer.h"
 #include "Protocol.h"
@@ -101,51 +102,6 @@ namespace TradeTogether::Trade
                 GetCurrentProcessId(),
                 GetTickCount64(),
                 ++state.nextRequest);
-        }
-
-        bool OpenInventoryThroughPapyrus(RE::Actor* a_actor)
-        {
-            if (!a_actor) {
-                return false;
-            }
-
-            auto* skyrimVM = RE::SkyrimVM::GetSingleton();
-            if (!skyrimVM || !skyrimVM->impl) {
-                spdlog::error("Cannot open inventory: SkyrimVM is unavailable");
-                return false;
-            }
-
-            auto* vm = skyrimVM->impl.get();
-            auto* handlePolicy = vm->GetObjectHandlePolicy();
-            if (!handlePolicy) {
-                spdlog::error(
-                    "Cannot open inventory: Papyrus object handle policy is unavailable");
-                return false;
-            }
-
-            const auto handle = handlePolicy->GetHandleForObject(
-                a_actor->GetFormType(),
-                a_actor);
-            if (handle == handlePolicy->EmptyHandle()) {
-                spdlog::error(
-                    "Cannot open inventory: no Papyrus handle for actor {:08X}",
-                    a_actor->GetFormID());
-                return false;
-            }
-
-            RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> callback;
-            const bool dispatched = vm->DispatchMethodCall(
-                handle,
-                RE::BSFixedString("Actor"),
-                RE::BSFixedString("OpenInventory"),
-                RE::MakeFunctionArguments(true),
-                callback);
-            if (!dispatched) {
-                spdlog::error(
-                    "Papyrus dispatch Actor.OpenInventory(true) failed for actor {:08X}",
-                    a_actor->GetFormID());
-            }
-            return dispatched;
         }
 
         RE::Actor* GetCrosshairActor()
@@ -408,44 +364,35 @@ namespace TradeTogether::Trade
             }
 
             auto session = std::move(*state.session);
-            state.session.reset();
-            if (!session.initiator) {
-                Notify(fmt::format(
-                    "TradeTogether: echange valide. {} ouvre l'inventaire.",
-                    session.peerName));
-                spdlog::info(
-                    "Trade finalized as responder: request={} peer=\"{}\"",
-                    session.requestID,
-                    session.peerName);
-                return;
-            }
-
-            auto actor = session.target.get();
             auto* player = RE::PlayerCharacter::GetSingleton();
-            if (!actor || actor.get() == player) {
-                Notify("TradeTogether: le joueur cible n'est plus disponible.");
+            std::string transferError;
+            if (!AutoTransfer::ExecuteLocalExchange(
+                    player,
+                    session.localOffer,
+                    session.remoteOffer,
+                    transferError)) {
+                state.session.reset();
+                Notify(fmt::format(
+                    "TradeTogether: transfert annule ({})",
+                    transferError));
+                spdlog::error(
+                    "Automatic trade transfer failed: request={} peer=\"{}\" reason=\"{}\"",
+                    session.requestID,
+                    session.peerName,
+                    transferError);
                 return;
             }
 
-            const auto currentName = GetActorName(actor.get());
-            if (currentName.empty() ||
-                !Protocol::EqualsInsensitive(currentName, session.peerName)) {
-                Notify("TradeTogether: la cible de l'echange a change.");
-                return;
-            }
-
-            if (!OpenInventoryThroughPapyrus(actor.get())) {
-                Notify("TradeTogether: impossible d'ouvrir l'inventaire.");
-                return;
-            }
+            state.session.reset();
             Notify(fmt::format(
-                "TradeTogether: echange confirme avec {}.",
+                "TradeTogether: echange automatique termine avec {}.",
                 session.peerName));
             spdlog::info(
-                "Trade finalized and inventory opened: request={} actor={:08X} peer=\"{}\"",
+                "Automatic trade transfer completed: request={} peer=\"{}\" givenLines={} receivedLines={}",
                 session.requestID,
-                actor->GetFormID(),
-                session.peerName);
+                session.peerName,
+                session.localOffer.size(),
+                session.remoteOffer.size());
         }
 
         void ConfirmLocalOffer()
@@ -458,6 +405,21 @@ namespace TradeTogether::Trade
             if (!state.session->localReady || !state.session->remoteReady) {
                 Notify("TradeTogether: une offre a change, verifiez a nouveau.");
                 ShowOfferSummary();
+                return;
+            }
+
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            std::string validationError;
+            if (!AutoTransfer::ValidateLocalOffer(
+                    player,
+                    state.session->localOffer,
+                    validationError)) {
+                ResetLocalApproval();
+                SendLocalState(false);
+                Notify(fmt::format(
+                    "TradeTogether: offre invalide ({})",
+                    validationError));
+                OpenOfferInventory();
                 return;
             }
 
