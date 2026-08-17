@@ -32,6 +32,7 @@ if errorlevel 1 exit /b %errorlevel%
 echo.
 echo [TradeTogether] Build termine.
 echo DLL: package\Data\SKSE\Plugins\TradeTogether.dll
+echo FOMOD core DLL: package\00 Core\Data\SKSE\Plugins\TradeTogether.dll
 
 echo.
 call "%~dp0make_vortex_archive.bat"
@@ -39,5 +40,5 @@ if errorlevel 1 exit /b %errorlevel%
 
 echo.
 echo [TradeTogether] Tout est pret.
-echo Archive Vortex: dist\TradeTogether-v0.7.1-Vortex.zip
+echo Archive Vortex: dist\TradeTogether-v0.8.0-Vortex.zip
 endlocal
