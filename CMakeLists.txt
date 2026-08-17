@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(TradeTogether VERSION 0.8.1 LANGUAGES CXX)
+project(TradeTogether VERSION 0.8.2 LANGUAGES CXX)
 set(TRADETOGETHER_RELEASE_VERSION "${PROJECT_VERSION}-udp")
 
 set(CMAKE_CXX_STANDARD 23)
@@ -18,6 +18,8 @@ set(PROJECT_SOURCES
     src/Config.cpp
     src/Input.h
     src/Input.cpp
+    src/Localization.h
+    src/Localization.cpp
     src/Offer.h
     src/Offer.cpp
     src/Protocol.h
