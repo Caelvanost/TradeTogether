@@ -6,9 +6,9 @@ namespace TradeTogether
     {
         bool networkEnabled{ true };
         bool autoDiscovery{ true };
+        bool autoRemoteFromSTR{ false };
 
-        // TradeTogether has its own port so it can run beside the other
-        // Together synchronization plugins in this workspace.
+        // TradeTogether has its own port so it can run beside Skyrim Together.
         std::uint16_t localPort{ 27993 };
         std::string peerHost{};
         std::uint16_t peerPort{ 27993 };
