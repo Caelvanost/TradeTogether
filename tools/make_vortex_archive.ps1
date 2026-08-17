@@ -1,6 +1,6 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.8.1-udp"
+    [string]$Version = "0.8.2-udp"
 )
 
 $ErrorActionPreference = "Stop"
