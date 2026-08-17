@@ -1,4 +1,4 @@
-# TradeTogether v0.6.0
+# TradeTogether v0.6.1
 
 Synchronized trade-offer interface with automatic item transfer for Skyrim Together Reborn.
 
@@ -55,12 +55,16 @@ confirmed:
 - the items in the local offer are removed from the local player;
 - the items in the remote offer are added to the local player.
 
+The synchronized offer payload carries the **FormID, quantity and display name**
+for every offered line so the receiving client can resolve the correct base
+object before executing the automatic transfer.
+
 This avoids depending on Skyrim Together Reborn's remote actor proxy for the
 actual inventory mutation.
 
 ### Current limitation
 
-v0.6.0 transfers items by **FormID and quantity**. This is suitable for normal
+v0.6.1 transfers items by **FormID and quantity**. This is suitable for normal
 stackable items and standard unmodified equipment.
 
 Custom instance data is not serialized yet. Renamed, tempered, uniquely
@@ -95,5 +99,5 @@ The script builds the DLL, copies it together with the INI into the package,
 and creates:
 
 ```text
-dist/TradeTogether-v0.6.0-Vortex.zip
+dist/TradeTogether-v0.6.1-Vortex.zip
 ```
