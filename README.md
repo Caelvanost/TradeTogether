@@ -1,4 +1,4 @@
-# TradeTogether v0.8.0
+# TradeTogether v0.8.1
 
 Synchronized trade-offer interface with automatic instance-aware item and gold transfer for Skyrim Together Reborn.
 
@@ -42,6 +42,12 @@ Before final confirmation, TradeTogether verifies that the local player still ow
 
 The amount is clamped between **0** and the player's currently available gold, so the offer cannot go negative or exceed the player's balance.
 
+### v0.8.1 input fix
+
+SkyUI / InventoryMenu does not consistently expose numpad `+` and `-` through the same raw `ButtonEvent` scan-code path used by the other trade keys. v0.8.1 reads the physical Windows `VK_ADD` / `VK_SUBTRACT` state with edge detection, while keeping the existing Skyrim input path for T, Insert, Delete and Tab.
+
+Each detected gold-key press is written to `TradeTogether.log` at info level, including the resolved delta.
+
 ## Native instance-aware item transfer
 
 TradeTogether transfers the exact local inventory stack to Skyrim Together Reborn's proxy of the other player using Skyrim's native container-transfer path.
@@ -82,5 +88,5 @@ The log is located at:
 The script builds the DLL, copies it together with the INI into the package, and creates:
 
 ```text
-dist/TradeTogether-v0.8.0-Vortex.zip
+dist/TradeTogether-v0.8.1-Vortex.zip
 ```
