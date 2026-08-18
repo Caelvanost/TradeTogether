@@ -1,6 +1,6 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.8.2-udp"
+    [string]$Version = "0.9.0-udp"
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,12 +22,13 @@ $iniPath = Join-Path $pluginDir "TradeTogether.ini"
 $fomodConfig = Join-Path $packageDir "fomod\ModuleConfig.xml"
 $fomodInfo = Join-Path $packageDir "fomod\info.xml"
 $fomodCoreDll = Join-Path $packageDir "00 Core\Data\SKSE\Plugins\TradeTogether.dll"
-$clientIni = Join-Path $packageDir "10 Remote Client\Data\SKSE\Plugins\TradeTogether.ini"
+$lanIni = Join-Path $packageDir "10 LAN\Data\SKSE\Plugins\TradeTogether.ini"
 $hostIni = Join-Path $packageDir "20 Remote Host\Data\SKSE\Plugins\TradeTogether.ini"
+$clientIni = Join-Path $packageDir "30 Remote Client\Data\SKSE\Plugins\TradeTogether.ini"
 $distDir = Join-Path $ProjectRoot "dist"
 $archivePath = Join-Path $distDir ("TradeTogether-v{0}-Vortex.zip" -f $Version)
 
-foreach ($requiredFile in @($dllPath, $iniPath, $fomodConfig, $fomodInfo, $fomodCoreDll, $clientIni, $hostIni)) {
+foreach ($requiredFile in @($dllPath, $iniPath, $fomodConfig, $fomodInfo, $fomodCoreDll, $lanIni, $hostIni, $clientIni)) {
     if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
         throw "Fichier de package introuvable: $requiredFile. Compile d'abord avec build_release.bat."
     }
@@ -47,4 +48,4 @@ Compress-Archive `
 
 Write-Host "[TradeTogether] Archive Vortex/FOMOD creee:" -ForegroundColor Green
 Write-Host "  $archivePath"
-Write-Host "  Profils: Remote Client / Remote Host"
+Write-Host "  Profils: LAN / Remote Host / Remote Client"
