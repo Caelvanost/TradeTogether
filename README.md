@@ -1,12 +1,12 @@
-# TradeTogether v0.8.2-udp
+# TradeTogether v0.9.0-udp
 
-Remote UDP edition of TradeTogether for Skyrim Together Reborn. It contains the same validated item and gold trading core as `main` v0.8.2, plus automatic remote-client discovery of the STR server address and Host/Client FOMOD profiles.
+TradeTogether adds synchronized player-to-player item and gold trading to Skyrim Together Reborn. The UDP edition now ships as one FOMOD for both **LAN** and **remote Internet** play.
 
 ## Trade flow
 
 1. Both players install the same TradeTogether build and connect through Skyrim Together Reborn.
-2. The requester targets the other player and presses **T**.
-3. The other player chooses **Accept / Refuse**.
+2. Target the other player and press **T**.
+3. The target chooses **Accept / Decline**.
 4. Both players compose their offers in their own inventory:
    - **Insert**: add one unit of the selected item;
    - **Delete**: remove one unit of the selected item;
@@ -16,35 +16,31 @@ Remote UDP edition of TradeTogether for Skyrim Together Reborn. It contains the 
    - **T**: review the offers and mark ready;
    - **Tab**: cancel.
 5. Both players receive one final **Confirm / Modify** prompt.
-6. After both confirmations, TradeTogether transfers the items and gold automatically.
+6. After both confirmations, TradeTogether transfers the offered items and gold automatically.
 
-Any item or gold change clears the Ready state. There is no direct-inventory step and no additional user confirmation. TradeTogether deliberately does not intercept **E** or **A**.
+All user-facing notifications, prompts, summaries and validation errors are displayed in English.
 
-## English UI
+## FOMOD network modes
 
-Starting with **v0.8.2-udp**, all user-facing TradeTogether notifications, trade summaries, validation errors, prompts and MessageBox buttons are displayed in English for the public Nexus Mods release.
+The installer offers exactly one network mode per PC.
 
-## Gold trading
+### LAN
 
-Gold is synchronized as a dedicated `gold` field in the trade state rather than as a normal item line. The offered amount is clamped between 0 and the player's current balance and is verified again immediately before final confirmation.
+Choose **LAN** on every PC when all players are on the same local network.
 
-Gold uses Skyrim's native Gold form (`0000000F`) and is transferred to the other player's STR proxy through the same native container-transfer path used for normal stackable items. Gold cannot be added with Insert, preventing it from being counted twice.
+```ini
+AutoDiscovery=1
+AutoRemoteFromSTR=0
+LocalPort=27993
+PeerHost=
+PeerPort=27993
+```
 
-An offer may contain items + gold, only gold, only items, or be empty for a one-way gift.
-
-## Instance-aware item transfer
-
-TradeTogether transfers the actual local Skyrim inventory instance through the native container transfer path. When an item has an `ExtraDataList`, that exact list is passed to `RemoveItem` with the other player's STR proxy as the destination.
-
-This is intended to preserve smithing/tempering improvements, enchantments and charge, custom item names, and other per-instance extra data. Standard stackable items are transferred normally as base stacks.
-
-## Remote UDP mode
-
-TradeTogether uses **UDP port 27993** independently of Skyrim Together Reborn.
+TradeTogether discovers peers automatically by UDP broadcast. No router port forwarding and no manual IP address are required. Windows Firewall must still allow the game/plugin to communicate on the private network.
 
 ### Remote Host
 
-Choose **Remote Host** in the FOMOD.
+Choose **Remote Host** on the PC hosting remote players over the Internet.
 
 ```ini
 AutoDiscovery=0
@@ -54,17 +50,11 @@ PeerHost=
 PeerPort=27993
 ```
 
-On the host network:
+Forward **UDP 27993** on the router to the Host PC and allow UDP 27993 through Windows Firewall. Leave `PeerHost` empty. The Host learns the Client's NAT endpoint when the Client contacts it.
 
-1. Forward **UDP 27993** on the router to the host PC's local IPv4 address.
-2. Allow UDP 27993 through Windows Firewall for Skyrim / TradeTogether.
-3. Leave `PeerHost` empty.
+### Remote Client
 
-The host learns the client's real NAT endpoint from the automatic UDP handshake and can then send trade packets back to that client.
-
-### Remote Client — no IP entry required
-
-Choose **Remote Client** in the FOMOD. No manual IP configuration is normally required.
+Choose **Remote Client** on the remote player's PC.
 
 ```ini
 AutoDiscovery=0
@@ -74,48 +64,37 @@ PeerHost=
 PeerPort=27993
 ```
 
-TradeTogether periodically reads Skyrim Together Reborn's Chromium/localStorage cache and looks for STR's `last_connected_address`. Once the player connects to a STR server, TradeTogether extracts the host address and automatically uses the same host on **UDP 27993**.
+TradeTogether attempts to read Skyrim Together Reborn's last connected server address and contact the same host on UDP 27993.
 
-For example, if STR connects to:
+Automatic STR host discovery is still experimental. If the log shows `remoteConfigured=0`, set `PeerHost` manually to the Host's public IPv4 address and set `AutoRemoteFromSTR=0`. Keep `AutoDiscovery=0` for a true remote/manual test; enabling `AutoDiscovery` makes LAN broadcast discovery take over when both PCs are on the same local network.
 
-```text
-203.0.113.42:10578
-```
+## Gold trading
 
-TradeTogether automatically contacts:
+Gold is synchronized separately from normal item lines. The offered amount is clamped to the player's current balance and validated again immediately before transfer. Gold-only trades, item-only trades, mixed trades and one-way gifts are supported.
 
-```text
-203.0.113.42:27993
-```
+## Instance-aware item transfer
 
-It sends a `HELLO` to the host, which lets the host learn the client's NAT source endpoint before either player starts a trade. Either side can therefore initiate the first trade.
+TradeTogether transfers the actual local Skyrim inventory instance through Skyrim's native container-transfer path. When an item has an `ExtraDataList`, the exact list is supplied to `RemoveItem` with the other player's STR proxy as the destination.
 
-If the player changes STR servers, the address is re-read periodically and TradeTogether updates the remote endpoint automatically.
-
-`PeerHost` remains available only as a manual fallback. The client normally does **not** need a router port-forward rule.
-
-## LAN mode
-
-For LAN use, the regular `main` branch remains simpler and uses automatic broadcast discovery. The `udp` branch is intended for remote Internet play.
+This is intended to preserve smithing/tempering improvements, enchantments and charge, custom item names and other per-instance data. Standard stackable items are transferred normally.
 
 ## Current limitations
 
-- Both players must use matching TradeTogether builds.
-- The target player must be represented by a loaded/high-process STR actor proxy for the native transfer.
-- If two modified instances have the same base FormID and exactly the same display name, Skyrim may not expose enough information to distinguish them perfectly.
-- The host still needs reachable UDP 27993. CGNAT or restrictive firewalls can prevent conventional port forwarding.
-- Automatic client discovery depends on STR continuing to store `last_connected_address` in its Chromium localStorage cache. `PeerHost` remains the fallback if this changes.
+- Both players must use the exact same TradeTogether build.
+- The target player must have a loaded/high-process STR actor proxy for native transfer.
+- Two modified instances with the same base FormID and identical displayed names may not always be distinguishable.
+- Remote Host requires reachable UDP 27993; CGNAT or restrictive networks can prevent conventional port forwarding.
+- Automatic Remote Client discovery from STR is experimental; manual `PeerHost` is the current fallback.
 
 ## Versioning
 
-The functional version follows `main`. The remote branch appends `-udp` to make its build unambiguous:
+This release is:
 
 ```text
-main: v0.8.2
-udp:  v0.8.2-udp
+v0.9.0-udp
 ```
 
-CMake's `project(... VERSION ...)` field must remain numeric, so it stays `0.8.2`; `TRADETOGETHER_RELEASE_VERSION`, runtime logs, FOMOD metadata and deployment archive use `0.8.2-udp`.
+CMake keeps the numeric project version `0.9.0`; runtime logs, FOMOD metadata and the deployment archive use the `-udp` release suffix.
 
 ## Log
 
@@ -123,7 +102,7 @@ CMake's `project(... VERSION ...)` field must remain numeric, so it stays `0.8.2
 Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
 ```
 
-Useful entries include gold key presses, `automatic STR remote configured`, discovered peer addresses, sent packet counts, gold transfers and native instance-transfer entries.
+Useful networking entries include `Trade UDP started`, `manual remote configured`, `automatic STR remote configured`, `Trade peer discovered` and packet-routing diagnostics.
 
 ## Build
 
@@ -134,7 +113,7 @@ Useful entries include gold key presses, `automatic STR remote configured`, disc
 Expected archive:
 
 ```text
-dist/TradeTogether-v0.8.2-udp-Vortex.zip
+dist/TradeTogether-v0.9.0-udp-Vortex.zip
 ```
 
-The archive contains the FOMOD installer with **Remote Client** and **Remote Host** profiles.
+The archive contains the FOMOD profiles **LAN**, **Remote Host** and **Remote Client**.
