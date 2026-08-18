@@ -1,25 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd">
-  <moduleName>TradeTogether Remote UDP 0.8.2-udp</moduleName>
+  <moduleName>TradeTogether UDP 0.9.0-udp</moduleName>
   <requiredInstallFiles>
     <folder source="00 Core" destination="" priority="0" />
   </requiredInstallFiles>
   <installSteps order="Explicit">
-    <installStep name="Remote network role">
+    <installStep name="Network mode">
       <optionalFileGroups order="Explicit">
-        <group name="Choose this PC's role" type="SelectExactlyOne">
+        <group name="Choose how you play" type="SelectExactlyOne">
           <plugins order="Explicit">
-            <plugin name="Remote Client">
-              <description>Use on a player connecting to the Skyrim Together host. No IP entry is required: TradeTogether reads STR's last connected server address automatically and uses that host on UDP port 27993. The client normally needs no port forwarding.</description>
+            <plugin name="LAN">
+              <description>Use on both PCs when all players are on the same local network. TradeTogether discovers peers automatically by UDP broadcast. No router port forwarding or manual IP configuration is required.</description>
               <files>
-                <folder source="10 Remote Client" destination="" priority="10" />
+                <folder source="10 LAN" destination="" priority="10" />
               </files>
               <typeDescriptor><type name="Recommended" /></typeDescriptor>
             </plugin>
             <plugin name="Remote Host">
-              <description>Use on the host PC. Forward UDP port 27993 on the router to this PC and allow UDP 27993 through Windows Firewall. TradeTogether learns each client's NAT endpoint from the automatic handshake.</description>
+              <description>Use on the PC hosting remote players over the Internet. Forward UDP port 27993 on the router to this PC and allow UDP 27993 through Windows Firewall. Leave PeerHost empty.</description>
               <files>
                 <folder source="20 Remote Host" destination="" priority="20" />
+              </files>
+              <typeDescriptor><type name="Optional" /></typeDescriptor>
+            </plugin>
+            <plugin name="Remote Client">
+              <description>Use on a remote player connecting to the Skyrim Together host. TradeTogether attempts to read STR's last connected server address automatically and uses that host on UDP port 27993. PeerHost remains available as a manual fallback.</description>
+              <files>
+                <folder source="30 Remote Client" destination="" priority="30" />
               </files>
               <typeDescriptor><type name="Optional" /></typeDescriptor>
             </plugin>
