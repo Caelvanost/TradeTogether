@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(TradeTogether VERSION 0.8.2 LANGUAGES CXX)
+project(TradeTogether VERSION 0.9.0 LANGUAGES CXX)
 set(TRADETOGETHER_RELEASE_VERSION "${PROJECT_VERSION}-udp")
 
 set(CMAKE_CXX_STANDARD 23)
