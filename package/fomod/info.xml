@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <fomod>
-  <Name>TradeTogether Remote UDP</Name>
+  <Name>TradeTogether UDP</Name>
   <Author>Caelvanost</Author>
-  <Version>0.8.2-udp</Version>
-  <Description>Automatic instance-aware item and gold trading for Skyrim Together Reborn with English UI, remote UDP Host/Client profiles and automatic client host discovery from STR.</Description>
+  <Version>0.9.0-udp</Version>
+  <Description>Instance-aware item and gold trading for Skyrim Together Reborn with English UI and LAN, Remote Host and Remote Client UDP profiles.</Description>
 </fomod>
