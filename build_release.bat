@@ -40,5 +40,5 @@ if errorlevel 1 exit /b %errorlevel%
 
 echo.
 echo [TradeTogether] Tout est pret.
-echo Archive Vortex: dist\TradeTogether-v0.8.2-udp-Vortex.zip
+echo Archive Vortex: dist\TradeTogether-v0.9.0-udp-Vortex.zip
 endlocal
