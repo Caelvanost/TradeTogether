@@ -1,87 +1,97 @@
-# TradeTogether v0.8.2
+# TradeTogether v0.9.0-strpm
 
-Synchronized trade-offer interface with automatic instance-aware item and gold transfer for Skyrim Together Reborn.
+STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
-## Keyboard shortcut
+This branch keeps the current TradeTogether gameplay and transfer system while replacing TradeTogether's dedicated UDP transport with **STR Plugin Messaging (STRPM)**.
 
-TradeTogether uses **T** to start a trade with the targeted player and to validate your offer during the trade.
+## Requirements
 
-In Skyrim, **T is normally bound to Wait**. Before using TradeTogether, unbind or reassign **T** from the **Wait** command to avoid conflicts.
+- Skyrim Special Edition / Anniversary Edition
+- SKSE
+- Skyrim Together Reborn
+- `STRPluginMessagingAPI.dll` with a working STR bridge/backend
+- The same TradeTogether build on every player
+
+TradeTogether itself opens **no UDP socket** on this branch and requires no TradeTogether-specific port forwarding.
 
 ## Trade flow
 
-1. Both players install the same version of TradeTogether and connect to Skyrim Together Reborn.
-2. The requester targets the other character and presses **T**.
-3. The targeted player receives an **Accept / Refuse** prompt.
-4. After acceptance, the personal inventory opens for both players in offer-composition mode.
-5. Each player composes their offer:
+1. Both players connect through Skyrim Together Reborn.
+2. Target the other player's character and press **T**.
+3. The target receives an **Accept / Decline** prompt.
+4. Both players compose their offer in their personal inventory.
+5. **Insert** adds one selected item.
+6. **Delete** removes one selected item from the offer.
+7. **Numpad +/-** changes gold by 1 septim.
+8. **Shift + Numpad +/-** changes gold by 10 septims.
+9. **Ctrl + Numpad +/-** changes gold by 100 septims.
+10. **T** reviews the offers and marks the local player ready.
+11. **Tab** cancels the trade.
+12. After both players are ready, both receive the final **Confirm / Modify** prompt.
+13. After both confirmations, TradeTogether performs the automatic native transfer.
 
-   - **Insert**: add one unit of the selected item;
-   - **Delete**: remove one unit of the selected item;
-   - **Numpad + / -**: add or remove **1 septim**;
-   - **Shift + Numpad + / -**: add or remove **10 septims**;
-   - **Ctrl + Numpad + / -**: add or remove **100 septims**;
-   - **T**: display both offers and mark yourself as ready;
-   - **Tab**: cancel the entire trade.
+Quest items are rejected. Item-only, gold-only, mixed item/gold trades and one-way gifts are supported.
 
-   TradeTogether deliberately avoids **E** because Skyrim uses it to consume or activate inventory items, and avoids **A** because Skyrim uses it for inventory favorites by default.
+## Native instance-aware transfer
 
-6. Any item or gold change automatically clears the ready state.
-7. When both players are ready, each player sees both baskets and confirms one final time.
-8. After both confirmations, TradeTogether performs an invisible preflight and automatically transfers the offered items and septims.
+The STRPM branch uses the same automatic transfer code as the current main branch.
 
-Quest items are rejected. Gold is managed separately from normal item lines, so the Gold inventory entry cannot be added with Insert. An offer can contain up to 24 item lines and may contain only gold or even be empty, allowing one-way gifts.
+TradeTogether transfers the actual local Skyrim inventory stack to the loaded STR proxy of the other player. When a selected item has an `ExtraDataList`, the original list is supplied to Skyrim's native `RemoveItem` transfer path.
 
-The initial request expires after 30 seconds, and an inactive session expires after 5 minutes.
-
-## English UI
-
-Starting with **v0.8.2**, user-facing TradeTogether notifications, trade summaries, prompts, validation errors and MessageBox buttons are displayed in English for the public Nexus Mods release. Internal protocol behavior is unchanged.
-
-## Gold trading
-
-Gold is synchronized as a dedicated `gold` field in the trade state instead of being encoded as a normal `OfferLine`.
-
-Before final confirmation, TradeTogether verifies that the local player still owns at least the promised amount. The offered septims are then transferred through Skyrim's native container-transfer path to the other player's STR proxy, just like normal stackable items.
-
-The amount is clamped between **0** and the player's currently available gold, so the offer cannot go negative or exceed the player's balance.
-
-### v0.8.1 input fix
-
-SkyUI / InventoryMenu does not consistently expose numpad `+` and `-` through the same raw `ButtonEvent` scan-code path used by the other trade keys. v0.8.1 reads the physical Windows `VK_ADD` / `VK_SUBTRACT` state with edge detection, while keeping the existing Skyrim input path for T, Insert, Delete and Tab.
-
-Each detected gold-key press is written to `TradeTogether.log` at info level, including the resolved delta.
-
-## Native instance-aware item transfer
-
-TradeTogether transfers the exact local inventory stack to Skyrim Together Reborn's proxy of the other player using Skyrim's native container-transfer path.
-
-When an item has an `ExtraDataList`, that exact list is supplied to `RemoveItem`. This is intended to preserve:
+This is intended to preserve:
 
 - smithing / tempering improvements;
-- custom or extra enchantments;
+- vanilla and custom enchantments;
 - enchantment charge;
 - custom item names;
-- other per-instance data carried by Skyrim's native extra-data list.
+- other per-instance data stored by Skyrim.
 
-Standard stackable objects without per-instance data are transferred as normal base stacks.
+Gold uses Skyrim's native Gold form and follows the same native transfer path.
 
-TradeTogether identifies the active peer from the most recent trade-network packet, resolves the corresponding high-process actor by character name, and uses that STR proxy as the native transfer destination.
+## STR Plugin Messaging transport
 
-### Current limitation
+Channel:
 
-If two different modified instances have the same base FormID **and the exact same display name**, Skyrim's inventory representation may not expose enough information to distinguish them perfectly. TradeTogether prefers matching `ExtraDataList` stacks before falling back to an unmodified base stack.
+```text
+chaos.trade_together.offer.v1
+```
 
-## Network
+Trade packets keep the existing `TTNET|v1|...` payload format. STRPM messages are sent with **reliable + ordered** flags.
 
-TradeTogether uses an independent UDP channel on port **27993**. Discovery is automatic on a local network. Both players must allow Skyrim through their private-network firewall.
+TradeTogether first targets the remote player by display name. If STRPM cannot resolve that player target yet, TradeTogether uses an all-players fallback; the normal TradeTogether `to` field still filters the packet on receipt.
 
-For a connection without LAN discovery, set `AutoDiscovery=0`, `PeerHost`, and `PeerPort` in `Data/SKSE/Plugins/TradeTogether.ini`. UDP port forwarding may be required depending on the router.
+The transport refreshes the local display name before sending, avoiding the startup `Prisoner` name becoming permanently cached after a save loads.
 
-Players are associated by their character name. The initial target may be any `Actor` other than the local player because STR does not expose a stable public SKSE API for formally identifying its remote actors.
+Incoming packets update TradeTogether's most-recent peer identity, which is then used by the native item/gold transfer layer to resolve the corresponding loaded STR actor proxy.
+
+## Diagnostics
 
 The log is located at:
-`Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log`.
+
+```text
+Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
+```
+
+Expected startup entries include:
+
+```text
+TradeTogether v0.9.0-strpm loading
+TradeTogether STRPM transport started: channel=chaos.trade_together.offer.v1 ...
+TradeTogether STRPM status startup: backend=STRBridge ...
+TradeTogether v0.9.0-strpm ready ... network=ready
+```
+
+If STRPM is missing or incompatible, the log reports:
+
+```text
+TradeTogether STRPM API unavailable: STRPluginMessagingAPI.dll not found or incompatible
+```
+
+If sending fails, TradeTogether logs the STRPM result and the current bridge/backend diagnostics when available.
+
+## Current status
+
+`v0.9.0-strpm` is the first port of the current TradeTogether feature set to STR Plugin Messaging. It must still be compiled and tested with two connected STR clients before being considered stable.
 
 ## Build
 
@@ -89,8 +99,8 @@ The log is located at:
 .\build_release.bat
 ```
 
-The script builds the DLL, copies it together with the INI into the package, and creates:
+Expected archive:
 
 ```text
-dist/TradeTogether-v0.8.2-Vortex.zip
+dist/TradeTogether-v0.9.0-strpm-Vortex.zip
 ```
