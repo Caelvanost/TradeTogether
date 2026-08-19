@@ -1,4 +1,4 @@
-# TradeTogether v0.9.0-strpm
+# TradeTogether v0.9.1-strpm
 
 STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
@@ -53,7 +53,7 @@ Gold uses Skyrim's native Gold form and follows the same native transfer path.
 Channel:
 
 ```text
-chaos.trade_together.offer.v1
+tradetogether.offer.v1
 ```
 
 Trade packets keep the existing `TTNET|v1|...` payload format. STRPM messages are sent with **reliable + ordered** flags.
@@ -75,10 +75,10 @@ Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
 Expected startup entries include:
 
 ```text
-TradeTogether v0.9.0-strpm loading
-TradeTogether STRPM transport started: channel=chaos.trade_together.offer.v1 ...
+TradeTogether v0.9.1-strpm loading
+TradeTogether STRPM transport started: channel=tradetogether.offer.v1 ...
 TradeTogether STRPM status startup: backend=STRBridge ...
-TradeTogether v0.9.0-strpm ready ... network=ready
+TradeTogether v0.9.1-strpm ready ... network=ready
 ```
 
 If STRPM is missing or incompatible, the log reports:
@@ -91,7 +91,7 @@ If sending fails, TradeTogether logs the STRPM result and the current bridge/bac
 
 ## Current status
 
-`v0.9.0-strpm` is the first port of the current TradeTogether feature set to STR Plugin Messaging. It must still be compiled and tested with two connected STR clients before being considered stable.
+`v0.9.1-strpm` is the first port of the current TradeTogether feature set to STR Plugin Messaging, with a neutral public channel identifier. It must still be compiled and tested with two connected STR clients before being considered stable.
 
 ## Build
 
@@ -102,5 +102,5 @@ If sending fails, TradeTogether logs the STRPM result and the current bridge/bac
 Expected archive:
 
 ```text
-dist/TradeTogether-v0.9.0-strpm-Vortex.zip
+dist/TradeTogether-v0.9.1-strpm-Vortex.zip
 ```
