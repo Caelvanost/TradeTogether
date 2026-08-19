@@ -1,19 +1,14 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.8.2"
+    [string]$Version = "0.9.0-strpm"
 )
 
 $ErrorActionPreference = "Stop"
 
-# If no project root is explicitly supplied, derive it from this script's
-# location: <project>\tools\make_vortex_archive.ps1 -> <project>.
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Split-Path -Parent $PSScriptRoot
 }
 
-# Normalize paths. In particular, avoid passing "%~dp0" from cmd.exe: its
-# trailing backslash can interact badly with the closing quote and produce an
-# invalid Windows path such as ...\TradeTogether.dll\".
 $ProjectRoot = $ProjectRoot.Trim().Trim('"')
 while ($ProjectRoot.EndsWith('\') -or $ProjectRoot.EndsWith('/')) {
     $ProjectRoot = $ProjectRoot.Substring(0, $ProjectRoot.Length - 1)
@@ -35,7 +30,6 @@ if (-not (Test-Path -LiteralPath $iniPath -PathType Leaf)) {
 }
 
 New-Item -ItemType Directory -Path $distDir -Force | Out-Null
-
 if (Test-Path -LiteralPath $archivePath) {
     Remove-Item -LiteralPath $archivePath -Force
 }
