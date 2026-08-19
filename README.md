@@ -1,4 +1,4 @@
-# TradeTogether v0.9.1-strpm
+# TradeTogether v0.9.2-strpm
 
 STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
@@ -32,6 +32,10 @@ TradeTogether itself opens **no UDP socket** on this branch and requires no Trad
 
 Quest items are rejected. Item-only, gold-only, mixed item/gold trades and one-way gifts are supported.
 
+## Target validation
+
+Starting with **v0.9.2-strpm**, TradeTogether no longer falls back to an all-players STRPM broadcast when a targeted name is not a connected STR player. Targeting a normal NPC therefore fails immediately and shows an invalid-target notification instead of creating a request that later times out.
+
 ## Native instance-aware transfer
 
 The STRPM branch uses the same automatic transfer code as the current main branch.
@@ -58,7 +62,7 @@ tradetogether.offer.v1
 
 Trade packets keep the existing `TTNET|v1|...` payload format. STRPM messages are sent with **reliable + ordered** flags.
 
-TradeTogether first targets the remote player by display name. If STRPM cannot resolve that player target yet, TradeTogether uses an all-players fallback; the normal TradeTogether `to` field still filters the packet on receipt.
+TradeTogether targets the remote player by STRPM display name. If STRPM returns `kTargetNotFound`, the request is rejected locally instead of being broadcast to all players.
 
 The transport refreshes the local display name before sending, avoiding the startup `Prisoner` name becoming permanently cached after a save loads.
 
@@ -75,10 +79,10 @@ Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
 Expected startup entries include:
 
 ```text
-TradeTogether v0.9.1-strpm loading
+TradeTogether v0.9.2-strpm loading
 TradeTogether STRPM transport started: channel=tradetogether.offer.v1 ...
 TradeTogether STRPM status startup: backend=STRBridge ...
-TradeTogether v0.9.1-strpm ready ... network=ready
+TradeTogether v0.9.2-strpm ready ... network=ready
 ```
 
 If STRPM is missing or incompatible, the log reports:
@@ -91,7 +95,7 @@ If sending fails, TradeTogether logs the STRPM result and the current bridge/bac
 
 ## Current status
 
-`v0.9.1-strpm` is the first port of the current TradeTogether feature set to STR Plugin Messaging, with a neutral public channel identifier. It must still be compiled and tested with two connected STR clients before being considered stable.
+`v0.9.2-strpm` is an early STRPM test build. It includes connected-player target validation and must still be tested with two connected STR clients before being considered stable.
 
 ## Build
 
@@ -102,5 +106,5 @@ If sending fails, TradeTogether logs the STRPM result and the current bridge/bac
 Expected archive:
 
 ```text
-dist/TradeTogether-v0.9.1-strpm-Vortex.zip
+dist/TradeTogether-v0.9.2-strpm-Vortex.zip
 ```
