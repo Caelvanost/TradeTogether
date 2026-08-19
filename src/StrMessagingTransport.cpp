@@ -183,14 +183,11 @@ namespace TradeTogether
         const std::string targetName(a_playerName);
         const STRPM::Target playerTarget{ STRPM::TargetKind::kPlayer, 0, targetName.c_str() };
         constexpr auto flags = STRPM::kMessageReliable | STRPM::kMessageOrdered;
-        auto result = _api->send(kChannel, playerTarget, packet.data(), packet.size(), flags);
+        const auto result = _api->send(kChannel, playerTarget, packet.data(), packet.size(), flags);
 
         if (result == STRPM::Result::kTargetNotFound) {
-            const STRPM::Target partyTarget{ STRPM::TargetKind::kAllPlayers, 0, nullptr };
-            result = _api->send(kChannel, partyTarget, packet.data(), packet.size(), flags);
-            if (result == STRPM::Result::kOk) {
-                spdlog::info("TradeTogether STRPM used all-players fallback for target=\"{}\"", a_playerName);
-            }
+            spdlog::info("TradeTogether STRPM rejected non-player/unknown target=\"{}\"", a_playerName);
+            return false;
         }
 
         if (result != STRPM::Result::kOk) {
