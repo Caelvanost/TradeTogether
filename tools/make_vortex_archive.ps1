@@ -1,6 +1,6 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.9.2-strpm"
+    [string]$Version = "0.9.3-strpm"
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,12 +21,18 @@ $dllPath = Join-Path $pluginDir "TradeTogether.dll"
 $iniPath = Join-Path $pluginDir "TradeTogether.ini"
 $distDir = Join-Path $ProjectRoot "dist"
 $archivePath = Join-Path $distDir ("TradeTogether-v{0}-Vortex.zip" -f $Version)
+$verifyScript = Join-Path $PSScriptRoot "verify_release_dll.ps1"
 
 if (-not (Test-Path -LiteralPath $dllPath -PathType Leaf)) {
     throw "DLL introuvable: $dllPath. Compile d'abord avec build_release.bat."
 }
 if (-not (Test-Path -LiteralPath $iniPath -PathType Leaf)) {
     throw "INI introuvable: $iniPath"
+}
+
+& $verifyScript -DllPath $dllPath -ExpectedVersion $Version
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
 }
 
 New-Item -ItemType Directory -Path $distDir -Force | Out-Null
