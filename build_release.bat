@@ -2,6 +2,9 @@
 setlocal
 cd /d "%~dp0"
 set "TRADETOGETHER_BUILD_DIR=out\build-release"
+set "TRADETOGETHER_VERSION=0.9.3-strpm"
+set "TRADETOGETHER_BUILT_DLL=%TRADETOGETHER_BUILD_DIR%\Release\TradeTogether.dll"
+set "TRADETOGETHER_PACKAGE_DLL=package\Data\SKSE\Plugins\TradeTogether.dll"
 
 if "%VCPKG_ROOT%"=="" set "VCPKG_ROOT=C:\dev\vcpkg"
 
@@ -25,13 +28,30 @@ cmake -S . -B "%TRADETOGETHER_BUILD_DIR%" -A x64 ^
   -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
 if errorlevel 1 exit /b %errorlevel%
 
-echo [TradeTogether] Compilation Release...
-cmake --build "%TRADETOGETHER_BUILD_DIR%" --config Release
+echo [TradeTogether] Suppression de toute DLL packagee precedente...
+if exist "%TRADETOGETHER_PACKAGE_DLL%" del /F /Q "%TRADETOGETHER_PACKAGE_DLL%"
+
+echo [TradeTogether] Compilation Release propre...
+cmake --build "%TRADETOGETHER_BUILD_DIR%" --config Release --target TradeTogether --clean-first
+if errorlevel 1 exit /b %errorlevel%
+
+if not exist "%TRADETOGETHER_BUILT_DLL%" (
+    echo [TradeTogether] ERREUR: DLL compilee introuvable: %TRADETOGETHER_BUILT_DLL%
+    exit /b 1
+)
+
+if not exist "package\Data\SKSE\Plugins" mkdir "package\Data\SKSE\Plugins"
+copy /Y "%TRADETOGETHER_BUILT_DLL%" "%TRADETOGETHER_PACKAGE_DLL%" >nul
+if errorlevel 1 exit /b %errorlevel%
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\verify_release_dll.ps1" ^
+  -DllPath "%~dp0%TRADETOGETHER_PACKAGE_DLL%" ^
+  -ExpectedVersion "%TRADETOGETHER_VERSION%"
 if errorlevel 1 exit /b %errorlevel%
 
 echo.
 echo [TradeTogether] Build termine.
-echo DLL: package\Data\SKSE\Plugins\TradeTogether.dll
+echo DLL: %TRADETOGETHER_PACKAGE_DLL%
 
 echo.
 call "%~dp0make_vortex_archive.bat"
@@ -39,5 +59,5 @@ if errorlevel 1 exit /b %errorlevel%
 
 echo.
 echo [TradeTogether] Tout est pret.
-echo Archive Vortex: dist\TradeTogether-v0.9.2-strpm-Vortex.zip
+echo Archive Vortex: dist\TradeTogether-v0.9.3-strpm-Vortex.zip
 endlocal
