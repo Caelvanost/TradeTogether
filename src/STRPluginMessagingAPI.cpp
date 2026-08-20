@@ -61,6 +61,42 @@ namespace STRPM
         return diagnostics;
     }
 
+    const TransportInterface* LoadTransportFromModule(const wchar_t* a_moduleName) noexcept
+    {
+        const auto module = LoadPluginModule(a_moduleName);
+        if (!module) {
+            return nullptr;
+        }
+        const auto rawExport = GetProcAddress(module, kQueryTransportExportName);
+        if (!rawExport) {
+            return nullptr;
+        }
+        const auto query = reinterpret_cast<QueryTransportInterfaceFn>(rawExport);
+        const TransportInterface* transport = nullptr;
+        if (query(kTransportInterfaceVersion, &transport) != Result::kOk || !transport || transport->version != kTransportInterfaceVersion) {
+            return nullptr;
+        }
+        return transport;
+    }
+
+    const ProxyResolverInterface* LoadProxyResolverFromModule(const wchar_t* a_moduleName) noexcept
+    {
+        const auto module = LoadPluginModule(a_moduleName);
+        if (!module) {
+            return nullptr;
+        }
+        const auto rawExport = GetProcAddress(module, kQueryProxyResolverExportName);
+        if (!rawExport) {
+            return nullptr;
+        }
+        const auto query = reinterpret_cast<QueryProxyResolverFn>(rawExport);
+        const ProxyResolverInterface* resolver = nullptr;
+        if (query(kProxyResolverVersion, &resolver) != Result::kOk || !resolver || resolver->version != kProxyResolverVersion) {
+            return nullptr;
+        }
+        return resolver;
+    }
+
     const char* ResultToString(Result a_result) noexcept
     {
         switch (a_result) {
