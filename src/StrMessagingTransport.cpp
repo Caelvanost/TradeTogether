@@ -74,9 +74,87 @@ namespace TradeTogether
 
     void STRPM_CALL StrMessagingTransport::OnMessage(const STRPM::Message* a_message, void* a_userData)
     {
+        // STRPluginMessagingBridge currently invokes this callback from its
+        // TransportService::OnConsume vectored exception handler. Keep this
+        // callback strictly allocation-free / lock-free: only copy into a
+        // preallocated SPSC ring and return immediately.
         if (a_userData) {
-            static_cast<StrMessagingTransport*>(a_userData)->HandleMessage(a_message);
+            static_cast<StrMessagingTransport*>(a_userData)->EnqueueInboundMessage(a_message);
         }
+    }
+
+    bool StrMessagingTransport::EnqueueInboundMessage(const STRPM::Message* a_message) noexcept
+    {
+        if (!a_message || !a_message->data || a_message->size == 0 ||
+            a_message->size > STRPM::kMaxPayloadBytes) {
+            return false;
+        }
+
+        const auto write = _inboundWrite.load(std::memory_order_relaxed);
+        const auto next = (write + 1) % kInboundQueueCapacity;
+        if (next == _inboundRead.load(std::memory_order_acquire)) {
+            _inboundDropped.fetch_add(1, std::memory_order_relaxed);
+            return false;
+        }
+
+        auto& slot = _inboundQueue[write];
+        slot.size = a_message->size;
+        std::memcpy(slot.payload.data(), a_message->data, a_message->size);
+        slot.senderConnectionID = a_message->sender.connectionID;
+        slot.flags = a_message->flags;
+        slot.sequence = a_message->sequence;
+
+        slot.senderName.fill('\0');
+        if (a_message->sender.displayName) {
+            for (std::size_t i = 0; i + 1 < slot.senderName.size(); ++i) {
+                const auto c = a_message->sender.displayName[i];
+                if (c == '\0') {
+                    break;
+                }
+                slot.senderName[i] = c;
+            }
+        }
+
+        _inboundWrite.store(next, std::memory_order_release);
+        return true;
+    }
+
+    void StrMessagingTransport::DispatchLoop(std::stop_token a_stopToken)
+    {
+        spdlog::info("TradeTogether STRPM deferred receive dispatcher started");
+
+        while (!a_stopToken.stop_requested()) {
+            const auto read = _inboundRead.load(std::memory_order_relaxed);
+            if (read == _inboundWrite.load(std::memory_order_acquire)) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+
+            HandleInboundMessage(_inboundQueue[read]);
+            _inboundRead.store(
+                (read + 1) % kInboundQueueCapacity,
+                std::memory_order_release);
+        }
+
+        const auto dropped = _inboundDropped.load(std::memory_order_relaxed);
+        spdlog::info(
+            "TradeTogether STRPM deferred receive dispatcher stopped: dropped={}",
+            dropped);
+    }
+
+    void StrMessagingTransport::HandleInboundMessage(const InboundMessage& a_message)
+    {
+        STRPM::Message message{};
+        message.channel = kChannel;
+        message.data = a_message.payload.data();
+        message.size = a_message.size;
+        message.sender.connectionID = a_message.senderConnectionID;
+        message.sender.displayName = a_message.senderName[0] != '\0' ?
+            a_message.senderName.data() : nullptr;
+        message.sender.isHost = false;
+        message.flags = a_message.flags;
+        message.sequence = a_message.sequence;
+        HandleMessage(&message);
     }
 
     void STRPM_CALL StrMessagingTransport::OnProxyMapping(const STRPM::ProxyMappingEvent* a_event, void* a_userData)
@@ -228,6 +306,9 @@ namespace TradeTogether
             _proxyConnections.clear();
             _namedConnections.clear();
         }
+        _inboundRead.store(0, std::memory_order_relaxed);
+        _inboundWrite.store(0, std::memory_order_relaxed);
+        _inboundDropped.store(0, std::memory_order_relaxed);
 
         RefreshIdentity();
 
@@ -257,13 +338,17 @@ namespace TradeTogether
 
         _listener = listener;
         _running.store(true);
+        _dispatchThread = std::jthread([this](std::stop_token a_stopToken) {
+            DispatchLoop(a_stopToken);
+        });
+
         std::size_t proxyCount = 0;
         {
             std::scoped_lock lock(_proxyMutex);
             proxyCount = _proxyConnections.size();
         }
         spdlog::info(
-            "TradeTogether STRPM transport started: channel={} player=\"{}\" connection={} mappedProxies={}",
+            "TradeTogether STRPM transport started: channel={} player=\"{}\" connection={} mappedProxies={} deferredReceive=1",
             kChannel,
             GetLocalPlayerName(),
             _localConnectionID,
@@ -289,6 +374,10 @@ namespace TradeTogether
                 spdlog::warn("TradeTogether STRPM unregisterChannel failed: {}", STRPM::ResultToString(result));
             }
         }
+        if (_dispatchThread.joinable()) {
+            _dispatchThread.request_stop();
+            _dispatchThread.join();
+        }
         {
             std::scoped_lock lock(_handlerMutex);
             _handler = {};
@@ -307,6 +396,8 @@ namespace TradeTogether
         _api = nullptr;
         _diagnostics = nullptr;
         _proxyResolver = nullptr;
+        _inboundRead.store(0, std::memory_order_relaxed);
+        _inboundWrite.store(0, std::memory_order_relaxed);
         spdlog::info("TradeTogether STRPM transport stopped");
     }
 
