@@ -1,4 +1,4 @@
-# TradeTogether v0.9.5-strpm
+# TradeTogether v0.9.6-strpm
 
 STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
@@ -9,7 +9,7 @@ This branch keeps the current TradeTogether gameplay and transfer system while r
 - Skyrim Special Edition / Anniversary Edition
 - SKSE
 - Skyrim Together Reborn
-- `STRPluginMessagingAPI.dll` with a working STR bridge/backend
+- A current `STRPluginMessagingAPI.dll` build exposing the STR bridge and Proxy Resolver
 - The same TradeTogether build on every player
 
 TradeTogether itself opens **no UDP socket** on this branch and requires no TradeTogether-specific port forwarding.
@@ -32,9 +32,18 @@ TradeTogether itself opens **no UDP socket** on this branch and requires no Trad
 
 Quest items are rejected. Item-only, gold-only, mixed item/gold trades and one-way gifts are supported.
 
-## Target validation
+## Connected-player target validation
 
-Starting with **v0.9.2-strpm**, TradeTogether no longer falls back to an all-players STRPM broadcast when a targeted name is not a connected STR player. Targeting a normal NPC therefore fails immediately and shows an invalid-target notification instead of creating a request that later times out.
+Starting with **v0.9.6-strpm**, TradeTogether uses STRPM's **Proxy Resolver** instead of trying to target players by display name alone.
+
+STRPM reports mappings between each connected player's `ConnectionID` and the local Skyrim FormID of that player's STR proxy. TradeTogether caches these mappings and resolves the displayed proxy name only from those mapped FormIDs.
+
+This provides two important guarantees:
+
+- normal NPCs are not valid TradeTogether targets because their FormIDs are not registered as STR player proxies;
+- real STR proxies are sent through `TargetKind::kPlayer` with the non-zero `ConnectionID` required by the STR bridge.
+
+The previous `v0.9.5-strpm` implementation passed `connectionID=0` and only supplied a display name. The current STR bridge intentionally rejects that target as `invalid argument`, which prevented real player proxies from receiving trade requests.
 
 ## Native instance-aware transfer
 
@@ -42,15 +51,7 @@ The STRPM branch uses the same automatic transfer code as the current main branc
 
 TradeTogether transfers the actual local Skyrim inventory stack to the loaded STR proxy of the other player. When a selected item has an `ExtraDataList`, the original list is supplied to Skyrim's native `RemoveItem` transfer path.
 
-This is intended to preserve:
-
-- smithing / tempering improvements;
-- vanilla and custom enchantments;
-- enchantment charge;
-- custom item names;
-- other per-instance data stored by Skyrim.
-
-Gold uses Skyrim's native Gold form and follows the same native transfer path.
+This is intended to preserve smithing improvements, enchantments, enchantment charge, custom names and other per-instance data stored by Skyrim. Gold uses Skyrim's native Gold form and follows the same native transfer path.
 
 ## STR Plugin Messaging transport
 
@@ -62,11 +63,7 @@ tradetogether.offer.v1
 
 Trade packets keep the existing `TTNET|v1|...` payload format. STRPM messages are sent with **reliable + ordered** flags.
 
-TradeTogether targets the remote player by STRPM display name. If STRPM returns `kTargetNotFound`, the request is rejected locally instead of being broadcast to all players.
-
-The transport refreshes the local display name before sending, avoiding the startup `Prisoner` name becoming permanently cached after a save loads.
-
-Incoming packets update TradeTogether's most-recent peer identity, which is then used by the native item/gold transfer layer to resolve the corresponding loaded STR actor proxy.
+Incoming packets cache the sender name and `ConnectionID`, while Proxy Resolver events maintain the authoritative local proxy FormID mappings.
 
 ## Diagnostics
 
@@ -79,31 +76,43 @@ Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
 Expected startup entries include:
 
 ```text
-TradeTogether v0.9.5-strpm loading
-TradeTogether STRPM transport started: channel=tradetogether.offer.v1 ...
-TradeTogether STRPM status startup: backend=STRBridge ...
-TradeTogether v0.9.5-strpm ready ... network=ready
+TradeTogether v0.9.6-strpm loading
+TradeTogether STRPM proxy mapped: connection=... form=...
+TradeTogether STRPM transport started: channel=tradetogether.offer.v1 ... mappedProxies=1
+TradeTogether STRPM status startup: backend=STRBridge ... mappedProxies=1
+TradeTogether v0.9.6-strpm ready ... network=ready
 ```
 
-If STRPM is missing or incompatible, the log reports:
+When a targeted proxy is resolved successfully:
 
 ```text
-TradeTogether STRPM API unavailable: STRPluginMessagingAPI.dll not found or incompatible
+TradeTogether STRPM resolved player proxy: name="..." connection=... form=...
+TradeTogether STRPM packet sent: target="..." connection=... bytes=...
 ```
 
-If sending fails, TradeTogether logs the STRPM result and the current bridge/backend diagnostics when available.
+A normal NPC or an unavailable proxy instead produces:
+
+```text
+TradeTogether STRPM target is not a mapped player proxy: name="..." mappedProxies=...
+```
+
+If the Proxy Resolver is missing, TradeTogether refuses to start its network layer and reports:
+
+```text
+TradeTogether STRPM proxy resolver unavailable: install a current STRPluginMessagingAPI build
+```
 
 ## Release-build safeguards
 
 Starting with **v0.9.3-strpm**, `build_release.bat` forces a clean TradeTogether target rebuild, deletes any previously packaged DLL, explicitly copies the freshly built DLL into `package/Data/SKSE/Plugins`, and validates that the DLL contains the expected STRPM version marker before an archive can be created.
 
-Starting with **v0.9.4-strpm**, archive creation no longer relies on `$LASTEXITCODE` after invoking the PowerShell DLL validator. The archive script explicitly verifies that the ZIP exists after `Compress-Archive`.
+Starting with **v0.9.4-strpm**, archive creation explicitly verifies that the ZIP exists after `Compress-Archive`.
 
-Starting with **v0.9.5-strpm**, the STRPM archive contains **only `package/Data`**. This prevents stale UDP/FOMOD directories such as `00 Core`, `10 LAN`, `20 Remote Host`, `30 Remote Client` or `fomod` from being included when they remain as untracked files after switching branches in the same working tree. If such residues are present locally, the packaging script reports them as ignored.
+Starting with **v0.9.5-strpm**, the STRPM archive contains **only `package/Data`**, so stale UDP/FOMOD directories left by another branch cannot enter the archive.
 
 ## Current status
 
-`v0.9.5-strpm` is an early STRPM test build. It includes connected-player target validation and hardened release packaging, and must still be tested with two connected STR clients before being considered stable.
+`v0.9.6-strpm` is an early STRPM test build. It fixes STR player targeting by using Proxy Resolver connection IDs and still needs two-client runtime validation.
 
 ## Build
 
@@ -114,7 +123,7 @@ Starting with **v0.9.5-strpm**, the STRPM archive contains **only `package/Data`
 Expected archive:
 
 ```text
-dist/TradeTogether-v0.9.5-strpm-Vortex.zip
+dist/TradeTogether-v0.9.6-strpm-Vortex.zip
 ```
 
 The archive root must contain only:
