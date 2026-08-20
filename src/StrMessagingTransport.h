@@ -67,9 +67,9 @@ namespace TradeTogether
         std::unordered_map<std::string, STRPM::ConnectionID> _namedConnections;
 
         std::array<InboundMessage, kInboundQueueCapacity> _inboundQueue{};
-        std::atomic_size_t _inboundWrite{ 0 };
-        std::atomic_size_t _inboundRead{ 0 };
-        std::atomic_uint32_t _inboundDropped{ 0 };
+        std::atomic<std::size_t> _inboundWrite{ 0 };
+        std::atomic<std::size_t> _inboundRead{ 0 };
+        std::atomic<std::uint32_t> _inboundDropped{ 0 };
         std::jthread _dispatchThread;
     };
 }
