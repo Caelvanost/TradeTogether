@@ -21,6 +21,19 @@ namespace TradeTogether
         [[nodiscard]] std::optional<std::string> GetMostRecentPeerName();
 
     private:
+        static constexpr std::size_t kInboundQueueCapacity = 32;
+        static constexpr std::size_t kInboundSenderNameCapacity = 256;
+
+        struct InboundMessage
+        {
+            std::array<char, STRPM::kMaxPayloadBytes> payload{};
+            std::size_t size{ 0 };
+            STRPM::ConnectionID senderConnectionID{ 0 };
+            std::array<char, kInboundSenderNameCapacity> senderName{};
+            std::uint32_t flags{ 0 };
+            std::uint64_t sequence{ 0 };
+        };
+
         StrMessagingTransport() = default;
         ~StrMessagingTransport();
         StrMessagingTransport(const StrMessagingTransport&) = delete;
@@ -29,6 +42,9 @@ namespace TradeTogether
         static void STRPM_CALL OnMessage(const STRPM::Message* a_message, void* a_userData);
         static void STRPM_CALL OnProxyMapping(const STRPM::ProxyMappingEvent* a_event, void* a_userData);
 
+        bool EnqueueInboundMessage(const STRPM::Message* a_message) noexcept;
+        void DispatchLoop(std::stop_token a_stopToken);
+        void HandleInboundMessage(const InboundMessage& a_message);
         void HandleMessage(const STRPM::Message* a_message);
         void HandleProxyMapping(const STRPM::ProxyMappingEvent* a_event);
         void RefreshIdentity();
@@ -49,5 +65,11 @@ namespace TradeTogether
         std::optional<std::string> _mostRecentPeerName;
         std::unordered_map<STRPM::ProxyFormID, STRPM::ConnectionID> _proxyConnections;
         std::unordered_map<std::string, STRPM::ConnectionID> _namedConnections;
+
+        std::array<InboundMessage, kInboundQueueCapacity> _inboundQueue{};
+        std::atomic_size_t _inboundWrite{ 0 };
+        std::atomic_size_t _inboundRead{ 0 };
+        std::atomic_uint32_t _inboundDropped{ 0 };
+        std::jthread _dispatchThread;
     };
 }
