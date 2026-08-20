@@ -1,6 +1,6 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.9.4-strpm"
+    [string]$Version = "0.9.5-strpm"
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,7 +16,8 @@ while ($ProjectRoot.EndsWith('\') -or $ProjectRoot.EndsWith('/')) {
 $ProjectRoot = [System.IO.Path]::GetFullPath($ProjectRoot)
 
 $packageDir = Join-Path $ProjectRoot "package"
-$pluginDir = Join-Path $packageDir "Data\SKSE\Plugins"
+$dataDir = Join-Path $packageDir "Data"
+$pluginDir = Join-Path $dataDir "SKSE\Plugins"
 $dllPath = Join-Path $pluginDir "TradeTogether.dll"
 $iniPath = Join-Path $pluginDir "TradeTogether.ini"
 $distDir = Join-Path $ProjectRoot "dist"
@@ -30,18 +31,32 @@ if (-not (Test-Path -LiteralPath $iniPath -PathType Leaf)) {
     throw "INI introuvable: $iniPath"
 }
 
-# verify_release_dll.ps1 throws on failure. Do not inspect $LASTEXITCODE here:
-# PowerShell script invocations do not reliably set it on success, and a null
-# value was causing the packaging script to exit before creating the archive.
 & $verifyScript -DllPath $dllPath -ExpectedVersion $Version
+
+# The same working tree is also used by the UDP branch. Git does not remove
+# untracked package directories when switching branches, so old FOMOD folders
+# such as "00 Core" may remain locally. They must never enter an STRPM archive.
+$legacyEntries = @("00 Core", "10 LAN", "20 Remote Host", "30 Remote Client", "fomod")
+$foundLegacyEntries = @()
+foreach ($entry in $legacyEntries) {
+    $entryPath = Join-Path $packageDir $entry
+    if (Test-Path -LiteralPath $entryPath) {
+        $foundLegacyEntries += $entry
+    }
+}
+if ($foundLegacyEntries.Count -gt 0) {
+    Write-Host ("[TradeTogether] Ignoring legacy UDP/FOMOD package residue: " + ($foundLegacyEntries -join ", ")) -ForegroundColor Yellow
+}
 
 New-Item -ItemType Directory -Path $distDir -Force | Out-Null
 if (Test-Path -LiteralPath $archivePath) {
     Remove-Item -LiteralPath $archivePath -Force
 }
 
+# STRPM is a simple Vortex package. Archive only the Data directory instead of
+# package\* so stale folders from another branch cannot be shipped accidentally.
 Compress-Archive `
-    -Path (Join-Path $packageDir "*") `
+    -Path $dataDir `
     -DestinationPath $archivePath `
     -CompressionLevel Optimal `
     -Force
