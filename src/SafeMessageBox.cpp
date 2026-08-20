@@ -7,41 +7,6 @@
 
 namespace RE
 {
-    namespace
-    {
-        class GameplayDispatchMessageBoxCallback final : public IMessageBoxCallback
-        {
-        public:
-            explicit GameplayDispatchMessageBoxCallback(IMessageBoxCallback* a_inner) :
-                _inner(a_inner)
-            {}
-
-            void Run(Message a_message) override
-            {
-                auto* inner = _inner.release();
-                if (!inner) {
-                    return;
-                }
-
-                auto runGameplayCallback = [inner, a_message]() {
-                    inner->Run(a_message);
-                    delete inner;
-                };
-
-                if (auto* tasks = SKSE::GetTaskInterface()) {
-                    spdlog::debug("SafeMessageBox dispatching callback to gameplay task");
-                    tasks->AddTask(std::move(runGameplayCallback));
-                } else {
-                    spdlog::warn("SafeMessageBox: SKSE task interface unavailable for callback; running synchronously");
-                    runGameplayCallback();
-                }
-            }
-
-        private:
-            std::unique_ptr<IMessageBoxCallback> _inner;
-        };
-    }
-
     void SafeCreateMessage(
         const char* a_message,
         IMessageBoxCallback* a_callback,
@@ -96,12 +61,11 @@ namespace RE
         data->unk4D = 0;
         data->unk4E = 0;
         data->unk4F = 0;
-        data->callback.reset(new GameplayDispatchMessageBoxCallback(a_callback));
+        data->callback.reset(a_callback);
 
         spdlog::debug(
-            "SafeMessageBox queueing from gameplay task with {} button(s)",
+            "SafeMessageBox queued with {} button(s)",
             data->buttonText.size());
         data->QueueMessage();
-        spdlog::debug("SafeMessageBox queue completed");
     }
 }
