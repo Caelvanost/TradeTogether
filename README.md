@@ -1,4 +1,4 @@
-# TradeTogether v0.9.2-strpm
+# TradeTogether v0.9.3-strpm
 
 STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
@@ -79,10 +79,10 @@ Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
 Expected startup entries include:
 
 ```text
-TradeTogether v0.9.2-strpm loading
+TradeTogether v0.9.3-strpm loading
 TradeTogether STRPM transport started: channel=tradetogether.offer.v1 ...
 TradeTogether STRPM status startup: backend=STRBridge ...
-TradeTogether v0.9.2-strpm ready ... network=ready
+TradeTogether v0.9.3-strpm ready ... network=ready
 ```
 
 If STRPM is missing or incompatible, the log reports:
@@ -93,9 +93,15 @@ TradeTogether STRPM API unavailable: STRPluginMessagingAPI.dll not found or inco
 
 If sending fails, TradeTogether logs the STRPM result and the current bridge/backend diagnostics when available.
 
+## Release-build safeguards
+
+Starting with **v0.9.3-strpm**, `build_release.bat` forces a clean TradeTogether target rebuild, deletes any previously packaged DLL, explicitly copies the freshly built DLL into `package/Data/SKSE/Plugins`, and validates that the DLL contains the expected STRPM version marker before an archive can be created.
+
+The archive script performs the same validation again before compression. This prevents an old UDP DLL left in `package` from being silently shipped inside a `-strpm` archive.
+
 ## Current status
 
-`v0.9.2-strpm` is an early STRPM test build. It includes connected-player target validation and must still be tested with two connected STR clients before being considered stable.
+`v0.9.3-strpm` is an early STRPM test build. It includes connected-player target validation and stricter release packaging, and must still be tested with two connected STR clients before being considered stable.
 
 ## Build
 
@@ -106,5 +112,5 @@ If sending fails, TradeTogether logs the STRPM result and the current bridge/bac
 Expected archive:
 
 ```text
-dist/TradeTogether-v0.9.2-strpm-Vortex.zip
+dist/TradeTogether-v0.9.3-strpm-Vortex.zip
 ```
