@@ -1,4 +1,4 @@
-# TradeTogether v0.9.7-strpm
+# TradeTogether v0.9.8-strpm
 
 STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
@@ -43,22 +43,28 @@ This provides two important guarantees:
 - normal NPCs are not valid TradeTogether targets because their FormIDs are not registered as STR player proxies;
 - real STR proxies are sent through `TargetKind::kPlayer` with the non-zero `ConnectionID` required by the STR bridge.
 
-## Safe message-box dispatch
+## Deferred STRPM receive path
 
-Starting with **v0.9.7-strpm**, TradeTogether no longer creates or queues Skyrim `MessageBoxData` directly from the gameplay task that processes incoming STRPM packets.
+Starting with **v0.9.8-strpm**, TradeTogether no longer performs normal C++/SKSE work directly from STRPM's receive callback.
 
-All TradeTogether message boxes are now scheduled through `SKSE::TaskInterface::AddUITask`. Their Accept / Decline / Confirm callbacks are then dispatched back through the normal SKSE gameplay task queue before modifying TradeTogether state or sending network packets.
+The current STR bridge delivers its consumer callback from the vectored exception handler used to intercept `TransportService::OnConsume`. Calling logging, mutexes, heap-heavy parsing, `SKSE::AddTask`, or UI code from that context can deadlock the receiving game.
 
-This is intended to prevent the receiver freeze observed immediately after an incoming trade request reached `SafeMessageBox::QueueMessage()`.
+TradeTogether now keeps the callback minimal:
 
-Additional diagnostics now distinguish the stages:
+1. Copy the incoming payload, sender ID and sender name into a preallocated lock-free ring buffer.
+2. Return immediately to the STR bridge exception handler.
+3. A dedicated TradeTogether dispatch thread consumes the queued packet outside the exception handler.
+4. The normal packet handler then schedules the gameplay work through SKSE, matching the execution model previously used by the stable UDP receiver.
+
+The ring buffer has 32 preallocated slots and performs no logging, locking or dynamic allocation inside the STRPM receive callback.
+
+The v0.9.7 `AddUITask` workaround has been removed. TradeTogether message boxes again use the proven `MessageBoxData::QueueMessage()` path from the gameplay task, while button callbacks are dispatched back to the gameplay task queue before changing trade state.
+
+Expected startup diagnostics include:
 
 ```text
-SafeMessageBox scheduled on UI task with 2 button(s)
-SafeMessageBox UI task started
-SafeMessageBox queueing on UI thread with 2 button(s)
-SafeMessageBox UI queue completed
-SafeMessageBox dispatching callback to gameplay task
+TradeTogether STRPM deferred receive dispatcher started
+TradeTogether STRPM transport started: ... deferredReceive=1
 ```
 
 ## Native instance-aware transfer
@@ -92,11 +98,12 @@ Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
 Expected startup entries include:
 
 ```text
-TradeTogether v0.9.7-strpm loading
+TradeTogether v0.9.8-strpm loading
+TradeTogether STRPM deferred receive dispatcher started
 TradeTogether STRPM proxy mapped: connection=... form=...
-TradeTogether STRPM transport started: channel=tradetogether.offer.v1 ... mappedProxies=1
+TradeTogether STRPM transport started: channel=tradetogether.offer.v1 ... mappedProxies=1 deferredReceive=1
 TradeTogether STRPM status startup: backend=STRBridge ... mappedProxies=1
-TradeTogether v0.9.7-strpm ready ... network=ready
+TradeTogether v0.9.8-strpm ready ... network=ready
 ```
 
 When a targeted proxy is resolved successfully:
@@ -104,6 +111,14 @@ When a targeted proxy is resolved successfully:
 ```text
 TradeTogether STRPM resolved player proxy: name="..." connection=... form=...
 TradeTogether STRPM packet sent: target="..." connection=... bytes=...
+```
+
+On the receiver, a successful request should reach:
+
+```text
+SafeMessageBox queueing from gameplay task with 2 button(s)
+SafeMessageBox queue completed
+Trade confirmation displayed: ...
 ```
 
 A normal NPC or an unavailable proxy instead produces:
@@ -128,7 +143,7 @@ Starting with **v0.9.5-strpm**, the STRPM archive contains **only `package/Data`
 
 ## Current status
 
-`v0.9.7-strpm` is an early STRPM test build. It keeps the Proxy Resolver targeting from v0.9.6 and routes message-box creation through the SKSE UI task queue to address receiver freezes.
+`v0.9.8-strpm` is an early STRPM test build. It keeps Proxy Resolver targeting and isolates STRPM receive callbacks from gameplay/UI work to address the receiver freeze.
 
 ## Build
 
@@ -139,7 +154,7 @@ Starting with **v0.9.5-strpm**, the STRPM archive contains **only `package/Data`
 Expected archive:
 
 ```text
-dist/TradeTogether-v0.9.7-strpm-Vortex.zip
+dist/TradeTogether-v0.9.8-strpm-Vortex.zip
 ```
 
 The archive root must contain only:
