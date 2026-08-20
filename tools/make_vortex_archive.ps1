@@ -1,6 +1,6 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.9.3-strpm"
+    [string]$Version = "0.9.4-strpm"
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,10 +30,10 @@ if (-not (Test-Path -LiteralPath $iniPath -PathType Leaf)) {
     throw "INI introuvable: $iniPath"
 }
 
+# verify_release_dll.ps1 throws on failure. Do not inspect $LASTEXITCODE here:
+# PowerShell script invocations do not reliably set it on success, and a null
+# value was causing the packaging script to exit before creating the archive.
 & $verifyScript -DllPath $dllPath -ExpectedVersion $Version
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
-}
 
 New-Item -ItemType Directory -Path $distDir -Force | Out-Null
 if (Test-Path -LiteralPath $archivePath) {
@@ -45,6 +45,10 @@ Compress-Archive `
     -DestinationPath $archivePath `
     -CompressionLevel Optimal `
     -Force
+
+if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+    throw "Archive creation failed: $archivePath"
+}
 
 Write-Host "[TradeTogether] Archive Vortex creee:" -ForegroundColor Green
 Write-Host "  $archivePath"
