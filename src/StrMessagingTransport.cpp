@@ -22,6 +22,18 @@ namespace TradeTogether
             return "Player";
         }
 
+        std::string ReadActorName(RE::Actor* a_actor)
+        {
+            if (!a_actor) {
+                return {};
+            }
+            const auto* name = a_actor->GetDisplayFullName();
+            if (!name || !*name) {
+                name = a_actor->GetName();
+            }
+            return name && *name ? name : std::string{};
+        }
+
         bool SameChannel(const STRPM::Message& a_message)
         {
             return a_message.channel && std::strcmp(a_message.channel, kChannel) == 0;
@@ -67,6 +79,50 @@ namespace TradeTogether
         }
     }
 
+    void STRPM_CALL StrMessagingTransport::OnProxyMapping(const STRPM::ProxyMappingEvent* a_event, void* a_userData)
+    {
+        if (a_userData) {
+            static_cast<StrMessagingTransport*>(a_userData)->HandleProxyMapping(a_event);
+        }
+    }
+
+    void StrMessagingTransport::HandleProxyMapping(const STRPM::ProxyMappingEvent* a_event)
+    {
+        if (!a_event) {
+            return;
+        }
+
+        std::scoped_lock lock(_proxyMutex);
+        if (a_event->type == STRPM::ProxyMappingEventType::kCleared) {
+            _proxyConnections.clear();
+            _namedConnections.clear();
+            spdlog::info("TradeTogether STRPM proxy mappings cleared");
+            return;
+        }
+
+        if (a_event->oldFormID != STRPM::kInvalidProxyFormID) {
+            _proxyConnections.erase(a_event->oldFormID);
+        }
+        if (a_event->type == STRPM::ProxyMappingEventType::kRemoved ||
+            a_event->type == STRPM::ProxyMappingEventType::kUpdated) {
+            std::erase_if(_namedConnections, [&](const auto& a_entry) {
+                return a_entry.second == a_event->connectionID;
+            });
+        }
+        if (a_event->newFormID != STRPM::kInvalidProxyFormID && a_event->connectionID != 0) {
+            _proxyConnections[a_event->newFormID] = a_event->connectionID;
+            spdlog::info(
+                "TradeTogether STRPM proxy mapped: connection={} form={:08X}",
+                a_event->connectionID,
+                a_event->newFormID);
+        } else if (a_event->type == STRPM::ProxyMappingEventType::kRemoved) {
+            spdlog::info(
+                "TradeTogether STRPM proxy removed: connection={} form={:08X}",
+                a_event->connectionID,
+                a_event->oldFormID);
+        }
+    }
+
     void StrMessagingTransport::RefreshIdentity()
     {
         if (!_api) {
@@ -88,6 +144,53 @@ namespace TradeTogether
         }
     }
 
+    std::optional<STRPM::ConnectionID> StrMessagingTransport::ResolveConnectionIDForPlayerName(std::string_view a_playerName)
+    {
+        if (a_playerName.empty()) {
+            return std::nullopt;
+        }
+
+        {
+            std::scoped_lock lock(_proxyMutex);
+            for (const auto& [name, connectionID] : _namedConnections) {
+                if (Protocol::EqualsInsensitive(name, a_playerName)) {
+                    return connectionID;
+                }
+            }
+        }
+
+        std::vector<std::pair<STRPM::ProxyFormID, STRPM::ConnectionID>> proxies;
+        {
+            std::scoped_lock lock(_proxyMutex);
+            proxies.reserve(_proxyConnections.size());
+            for (const auto& entry : _proxyConnections) {
+                proxies.push_back(entry);
+            }
+        }
+
+        for (const auto& [formID, connectionID] : proxies) {
+            auto* actor = RE::TESForm::LookupByID<RE::Actor>(formID);
+            const auto actorName = ReadActorName(actor);
+            if (!actorName.empty() && Protocol::EqualsInsensitive(actorName, a_playerName)) {
+                std::scoped_lock lock(_proxyMutex);
+                _namedConnections[actorName] = connectionID;
+                _namedConnections[std::string(a_playerName)] = connectionID;
+                spdlog::info(
+                    "TradeTogether STRPM resolved player proxy: name=\"{}\" connection={} form={:08X}",
+                    actorName,
+                    connectionID,
+                    formID);
+                return connectionID;
+            }
+        }
+
+        spdlog::info(
+            "TradeTogether STRPM target is not a mapped player proxy: name=\"{}\" mappedProxies={}",
+            a_playerName,
+            proxies.size());
+        return std::nullopt;
+    }
+
     bool StrMessagingTransport::Start(const Config& a_config, PacketHandler a_handler)
     {
         if (_running.load()) {
@@ -103,6 +206,14 @@ namespace TradeTogether
             return false;
         }
         _diagnostics = STRPM::LoadDiagnosticsFromModule();
+        _proxyResolver = STRPM::LoadProxyResolverFromModule();
+        if (!_proxyResolver || !_proxyResolver->registerListener || !_proxyResolver->unregisterListener) {
+            spdlog::error("TradeTogether STRPM proxy resolver unavailable: install a current STRPluginMessagingAPI build");
+            _api = nullptr;
+            _diagnostics = nullptr;
+            _proxyResolver = nullptr;
+            return false;
+        }
 
         {
             std::scoped_lock lock(_handlerMutex);
@@ -112,27 +223,51 @@ namespace TradeTogether
             std::scoped_lock lock(_peerMutex);
             _mostRecentPeerName.reset();
         }
+        {
+            std::scoped_lock lock(_proxyMutex);
+            _proxyConnections.clear();
+            _namedConnections.clear();
+        }
 
         RefreshIdentity();
 
         STRPM::ListenerHandle listener{};
-        const auto result = _api->registerChannel(kChannel, &StrMessagingTransport::OnMessage, this, &listener);
-        if (result != STRPM::Result::kOk) {
-            spdlog::error("TradeTogether STRPM registerChannel failed: {}", STRPM::ResultToString(result));
+        const auto channelResult = _api->registerChannel(kChannel, &StrMessagingTransport::OnMessage, this, &listener);
+        if (channelResult != STRPM::Result::kOk) {
+            spdlog::error("TradeTogether STRPM registerChannel failed: {}", STRPM::ResultToString(channelResult));
             std::scoped_lock lock(_handlerMutex);
             _handler = {};
             _api = nullptr;
             _diagnostics = nullptr;
+            _proxyResolver = nullptr;
+            return false;
+        }
+
+        const auto proxyResult = _proxyResolver->registerListener(&StrMessagingTransport::OnProxyMapping, this);
+        if (proxyResult != STRPM::Result::kOk) {
+            spdlog::error("TradeTogether STRPM proxy listener registration failed: {}", STRPM::ResultToString(proxyResult));
+            _api->unregisterChannel(listener);
+            std::scoped_lock lock(_handlerMutex);
+            _handler = {};
+            _api = nullptr;
+            _diagnostics = nullptr;
+            _proxyResolver = nullptr;
             return false;
         }
 
         _listener = listener;
         _running.store(true);
+        std::size_t proxyCount = 0;
+        {
+            std::scoped_lock lock(_proxyMutex);
+            proxyCount = _proxyConnections.size();
+        }
         spdlog::info(
-            "TradeTogether STRPM transport started: channel={} player=\"{}\" connection={}",
+            "TradeTogether STRPM transport started: channel={} player=\"{}\" connection={} mappedProxies={}",
             kChannel,
             GetLocalPlayerName(),
-            _localConnectionID);
+            _localConnectionID,
+            proxyCount);
         LogRuntimeStatus("startup");
         return true;
     }
@@ -141,6 +276,12 @@ namespace TradeTogether
     {
         if (!_running.exchange(false)) {
             return;
+        }
+        if (_proxyResolver && _proxyResolver->unregisterListener) {
+            const auto result = _proxyResolver->unregisterListener(&StrMessagingTransport::OnProxyMapping, this);
+            if (result != STRPM::Result::kOk && result != STRPM::Result::kNotAvailable) {
+                spdlog::warn("TradeTogether STRPM proxy listener unregister failed: {}", STRPM::ResultToString(result));
+            }
         }
         if (_api && _api->unregisterChannel && _listener.value != 0) {
             const auto result = _api->unregisterChannel(_listener);
@@ -156,16 +297,27 @@ namespace TradeTogether
             std::scoped_lock lock(_peerMutex);
             _mostRecentPeerName.reset();
         }
+        {
+            std::scoped_lock lock(_proxyMutex);
+            _proxyConnections.clear();
+            _namedConnections.clear();
+        }
         _listener = {};
         _localConnectionID = 0;
         _api = nullptr;
         _diagnostics = nullptr;
+        _proxyResolver = nullptr;
         spdlog::info("TradeTogether STRPM transport stopped");
     }
 
     bool StrMessagingTransport::SendTo(std::string_view a_playerName, std::string_view a_payload)
     {
         if (!_running.load() || !_api || !_api->send || a_playerName.empty() || a_payload.empty()) {
+            return false;
+        }
+
+        const auto connectionID = ResolveConnectionIDForPlayerName(a_playerName);
+        if (!connectionID || *connectionID == 0) {
             return false;
         }
 
@@ -180,26 +332,33 @@ namespace TradeTogether
             return false;
         }
 
-        const std::string targetName(a_playerName);
-        const STRPM::Target playerTarget{ STRPM::TargetKind::kPlayer, 0, targetName.c_str() };
+        const STRPM::Target playerTarget{ STRPM::TargetKind::kPlayer, *connectionID, nullptr };
         constexpr auto flags = STRPM::kMessageReliable | STRPM::kMessageOrdered;
         const auto result = _api->send(kChannel, playerTarget, packet.data(), packet.size(), flags);
 
         if (result == STRPM::Result::kTargetNotFound) {
-            spdlog::info("TradeTogether STRPM rejected non-player/unknown target=\"{}\"", a_playerName);
+            spdlog::info(
+                "TradeTogether STRPM target connection not found: name=\"{}\" connection={}",
+                a_playerName,
+                *connectionID);
             return false;
         }
 
         if (result != STRPM::Result::kOk) {
             spdlog::warn(
-                "TradeTogether STRPM send failed: target=\"{}\" result={}",
+                "TradeTogether STRPM send failed: target=\"{}\" connection={} result={}",
                 a_playerName,
+                *connectionID,
                 STRPM::ResultToString(result));
             LogRuntimeStatus("send failure");
             return false;
         }
 
-        spdlog::info("TradeTogether STRPM packet sent: target=\"{}\" bytes={}", a_playerName, packet.size());
+        spdlog::info(
+            "TradeTogether STRPM packet sent: target=\"{}\" connection={} bytes={}",
+            a_playerName,
+            *connectionID,
+            packet.size());
         return true;
     }
 
@@ -223,14 +382,20 @@ namespace TradeTogether
             spdlog::info("TradeTogether STRPM diagnostics unavailable ({})", a_context);
             return;
         }
+        std::size_t proxyCount = 0;
+        {
+            std::scoped_lock lock(_proxyMutex);
+            proxyCount = _proxyConnections.size();
+        }
         spdlog::info(
-            "TradeTogether STRPM status {}: backend={} bridgeAvailable={} bridgeActive={} knownPeers={} configuredPeers={}",
+            "TradeTogether STRPM status {}: backend={} bridgeAvailable={} bridgeActive={} knownPeers={} configuredPeers={} mappedProxies={}",
             a_context,
             BackendName(status->activeBackend),
             status->strBridgeAvailable,
             status->strBridgeActive,
             status->knownPeerCount,
-            status->configuredPeerCount);
+            status->configuredPeerCount,
+            proxyCount);
     }
 
     void StrMessagingTransport::HandleMessage(const STRPM::Message* a_message)
@@ -252,8 +417,14 @@ namespace TradeTogether
             peerName = std::string(a_message->sender.displayName);
         }
         if (peerName && !peerName->empty() && !Protocol::EqualsInsensitive(*peerName, GetLocalPlayerName())) {
-            std::scoped_lock lock(_peerMutex);
-            _mostRecentPeerName = *peerName;
+            {
+                std::scoped_lock lock(_peerMutex);
+                _mostRecentPeerName = *peerName;
+            }
+            if (a_message->sender.connectionID != 0) {
+                std::scoped_lock lock(_proxyMutex);
+                _namedConnections[*peerName] = a_message->sender.connectionID;
+            }
         }
 
         PacketHandler handler;
