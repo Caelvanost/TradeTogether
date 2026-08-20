@@ -1,4 +1,4 @@
-# TradeTogether v0.9.4-strpm
+# TradeTogether v0.9.5-strpm
 
 STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
@@ -79,10 +79,10 @@ Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
 Expected startup entries include:
 
 ```text
-TradeTogether v0.9.4-strpm loading
+TradeTogether v0.9.5-strpm loading
 TradeTogether STRPM transport started: channel=tradetogether.offer.v1 ...
 TradeTogether STRPM status startup: backend=STRBridge ...
-TradeTogether v0.9.4-strpm ready ... network=ready
+TradeTogether v0.9.5-strpm ready ... network=ready
 ```
 
 If STRPM is missing or incompatible, the log reports:
@@ -97,11 +97,13 @@ If sending fails, TradeTogether logs the STRPM result and the current bridge/bac
 
 Starting with **v0.9.3-strpm**, `build_release.bat` forces a clean TradeTogether target rebuild, deletes any previously packaged DLL, explicitly copies the freshly built DLL into `package/Data/SKSE/Plugins`, and validates that the DLL contains the expected STRPM version marker before an archive can be created.
 
-Starting with **v0.9.4-strpm**, archive creation no longer relies on `$LASTEXITCODE` after invoking the PowerShell DLL validator. That value can be null after a successful PowerShell script call and previously caused packaging to stop silently before creating `dist/TradeTogether-...zip`. The archive script now continues after a successful validator call and explicitly verifies that the ZIP exists after `Compress-Archive`.
+Starting with **v0.9.4-strpm**, archive creation no longer relies on `$LASTEXITCODE` after invoking the PowerShell DLL validator. The archive script explicitly verifies that the ZIP exists after `Compress-Archive`.
+
+Starting with **v0.9.5-strpm**, the STRPM archive contains **only `package/Data`**. This prevents stale UDP/FOMOD directories such as `00 Core`, `10 LAN`, `20 Remote Host`, `30 Remote Client` or `fomod` from being included when they remain as untracked files after switching branches in the same working tree. If such residues are present locally, the packaging script reports them as ignored.
 
 ## Current status
 
-`v0.9.4-strpm` is an early STRPM test build. It includes connected-player target validation and stricter release packaging, and must still be tested with two connected STR clients before being considered stable.
+`v0.9.5-strpm` is an early STRPM test build. It includes connected-player target validation and hardened release packaging, and must still be tested with two connected STR clients before being considered stable.
 
 ## Build
 
@@ -112,5 +114,11 @@ Starting with **v0.9.4-strpm**, archive creation no longer relies on `$LASTEXITC
 Expected archive:
 
 ```text
-dist/TradeTogether-v0.9.4-strpm-Vortex.zip
+dist/TradeTogether-v0.9.5-strpm-Vortex.zip
+```
+
+The archive root must contain only:
+
+```text
+Data/
 ```
