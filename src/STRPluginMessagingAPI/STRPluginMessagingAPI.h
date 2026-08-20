@@ -5,19 +5,28 @@
 
 #if defined(_WIN32)
 #define STRPM_CALL __cdecl
+#define STRPM_EXPORT extern "C" __declspec(dllexport)
 #else
 #define STRPM_CALL
+#define STRPM_EXPORT extern "C" __attribute__((visibility("default")))
 #endif
 
 namespace STRPM
 {
     inline constexpr std::uint32_t kInterfaceVersion = 2;
     inline constexpr std::uint32_t kDiagnosticsVersion = 2;
+    inline constexpr std::uint32_t kTransportInterfaceVersion = 1;
+    inline constexpr std::uint32_t kProxyResolverVersion = 1;
+    inline constexpr std::uint32_t kMaxChannelLength = 96;
     inline constexpr std::uint32_t kMaxPayloadBytes = 24 * 1024;
     inline constexpr char kQueryInterfaceExportName[] = "STR_QueryPluginMessagingInterface";
     inline constexpr char kQueryDiagnosticsExportName[] = "STR_QueryPluginMessagingDiagnostics";
+    inline constexpr char kQueryTransportExportName[] = "STRPM_QueryTransportInterface";
+    inline constexpr char kQueryProxyResolverExportName[] = "STR_QueryPluginMessagingProxyResolver";
 
     using ConnectionID = std::uint64_t;
+    using ProxyFormID = std::uint32_t;
+    inline constexpr ProxyFormID kInvalidProxyFormID = 0;
 
     enum class Result : std::uint32_t
     {
@@ -64,6 +73,14 @@ namespace STRPM
         kStrBridge = 2
     };
 
+    enum class ProxyMappingEventType : std::uint32_t
+    {
+        kAdded = 1,
+        kUpdated = 2,
+        kRemoved = 3,
+        kCleared = 4
+    };
+
     struct Target
     {
         TargetKind kind{ TargetKind::kAllPlayers };
@@ -93,8 +110,17 @@ namespace STRPM
         std::uint64_t value{ 0 };
     };
 
+    struct ProxyMappingEvent
+    {
+        ProxyMappingEventType type{ ProxyMappingEventType::kAdded };
+        ConnectionID connectionID{ 0 };
+        ProxyFormID oldFormID{ kInvalidProxyFormID };
+        ProxyFormID newFormID{ kInvalidProxyFormID };
+    };
+
     using ReceiveCallback = void(STRPM_CALL*)(const Message*, void*);
     using LogCallback = void(STRPM_CALL*)(const char*, void*);
+    using ProxyMappingCallback = void(STRPM_CALL*)(const ProxyMappingEvent*, void*);
 
     struct Interface
     {
@@ -129,10 +155,32 @@ namespace STRPM
         Result(STRPM_CALL* getRuntimeStatus)(RuntimeStatus*);
     };
 
+    struct TransportInterface
+    {
+        std::uint32_t version{ kTransportInterfaceVersion };
+        Result(STRPM_CALL* start)(ReceiveCallback, void*);
+        Result(STRPM_CALL* stop)();
+        Result(STRPM_CALL* send)(const char*, Target, const void*, std::size_t, std::uint32_t);
+        Result(STRPM_CALL* getLocalConnectionID)(ConnectionID*);
+        Result(STRPM_CALL* setLocalDisplayName)(const char*);
+    };
+
+    struct ProxyResolverInterface
+    {
+        std::uint32_t version{ kProxyResolverVersion };
+        Result(STRPM_CALL* resolve)(ConnectionID, ProxyFormID*);
+        Result(STRPM_CALL* registerListener)(ProxyMappingCallback, void*);
+        Result(STRPM_CALL* unregisterListener)(ProxyMappingCallback, void*);
+    };
+
     using QueryInterfaceFn = Result(STRPM_CALL*)(std::uint32_t, const Interface**);
     using QueryDiagnosticsFn = Result(STRPM_CALL*)(std::uint32_t, const DiagnosticsInterface**);
+    using QueryTransportInterfaceFn = Result(STRPM_CALL*)(std::uint32_t, const TransportInterface**);
+    using QueryProxyResolverFn = Result(STRPM_CALL*)(std::uint32_t, const ProxyResolverInterface**);
 
-    [[nodiscard]] const Interface* LoadFromModule(const wchar_t* a_moduleName = L"STRPluginMessagingAPI.dll") noexcept;
-    [[nodiscard]] const DiagnosticsInterface* LoadDiagnosticsFromModule(const wchar_t* a_moduleName = L"STRPluginMessagingAPI.dll") noexcept;
-    [[nodiscard]] const char* ResultToString(Result a_result) noexcept;
+    [[nodiscard]] const Interface* LoadFromModule(const wchar_t* moduleName = L"STRPluginMessagingAPI.dll") noexcept;
+    [[nodiscard]] const DiagnosticsInterface* LoadDiagnosticsFromModule(const wchar_t* moduleName = L"STRPluginMessagingAPI.dll") noexcept;
+    [[nodiscard]] const TransportInterface* LoadTransportFromModule(const wchar_t* moduleName) noexcept;
+    [[nodiscard]] const ProxyResolverInterface* LoadProxyResolverFromModule(const wchar_t* moduleName = L"STRPluginMessagingAPI.dll") noexcept;
+    [[nodiscard]] const char* ResultToString(Result result) noexcept;
 }
