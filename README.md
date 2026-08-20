@@ -1,4 +1,4 @@
-# TradeTogether v0.9.6-strpm
+# TradeTogether v0.9.7-strpm
 
 STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
@@ -43,7 +43,23 @@ This provides two important guarantees:
 - normal NPCs are not valid TradeTogether targets because their FormIDs are not registered as STR player proxies;
 - real STR proxies are sent through `TargetKind::kPlayer` with the non-zero `ConnectionID` required by the STR bridge.
 
-The previous `v0.9.5-strpm` implementation passed `connectionID=0` and only supplied a display name. The current STR bridge intentionally rejects that target as `invalid argument`, which prevented real player proxies from receiving trade requests.
+## Safe message-box dispatch
+
+Starting with **v0.9.7-strpm**, TradeTogether no longer creates or queues Skyrim `MessageBoxData` directly from the gameplay task that processes incoming STRPM packets.
+
+All TradeTogether message boxes are now scheduled through `SKSE::TaskInterface::AddUITask`. Their Accept / Decline / Confirm callbacks are then dispatched back through the normal SKSE gameplay task queue before modifying TradeTogether state or sending network packets.
+
+This is intended to prevent the receiver freeze observed immediately after an incoming trade request reached `SafeMessageBox::QueueMessage()`.
+
+Additional diagnostics now distinguish the stages:
+
+```text
+SafeMessageBox scheduled on UI task with 2 button(s)
+SafeMessageBox UI task started
+SafeMessageBox queueing on UI thread with 2 button(s)
+SafeMessageBox UI queue completed
+SafeMessageBox dispatching callback to gameplay task
+```
 
 ## Native instance-aware transfer
 
@@ -76,11 +92,11 @@ Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
 Expected startup entries include:
 
 ```text
-TradeTogether v0.9.6-strpm loading
+TradeTogether v0.9.7-strpm loading
 TradeTogether STRPM proxy mapped: connection=... form=...
 TradeTogether STRPM transport started: channel=tradetogether.offer.v1 ... mappedProxies=1
 TradeTogether STRPM status startup: backend=STRBridge ... mappedProxies=1
-TradeTogether v0.9.6-strpm ready ... network=ready
+TradeTogether v0.9.7-strpm ready ... network=ready
 ```
 
 When a targeted proxy is resolved successfully:
@@ -112,7 +128,7 @@ Starting with **v0.9.5-strpm**, the STRPM archive contains **only `package/Data`
 
 ## Current status
 
-`v0.9.6-strpm` is an early STRPM test build. It fixes STR player targeting by using Proxy Resolver connection IDs and still needs two-client runtime validation.
+`v0.9.7-strpm` is an early STRPM test build. It keeps the Proxy Resolver targeting from v0.9.6 and routes message-box creation through the SKSE UI task queue to address receiver freezes.
 
 ## Build
 
@@ -123,7 +139,7 @@ Starting with **v0.9.5-strpm**, the STRPM archive contains **only `package/Data`
 Expected archive:
 
 ```text
-dist/TradeTogether-v0.9.6-strpm-Vortex.zip
+dist/TradeTogether-v0.9.7-strpm-Vortex.zip
 ```
 
 The archive root must contain only:
