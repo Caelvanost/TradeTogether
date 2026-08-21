@@ -1,87 +1,166 @@
-# TradeTogether v0.8.2
+# TradeTogether v0.10.0-strpm
 
-Synchronized trade-offer interface with automatic instance-aware item and gold transfer for Skyrim Together Reborn.
+STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
-## Keyboard shortcut
+This branch keeps the current TradeTogether gameplay and transfer system while replacing TradeTogether's dedicated UDP transport with **STR Plugin Messaging (STRPM)**.
 
-TradeTogether uses **T** to start a trade with the targeted player and to validate your offer during the trade.
+## Requirements
 
-In Skyrim, **T is normally bound to Wait**. Before using TradeTogether, unbind or reassign **T** from the **Wait** command to avoid conflicts.
+- Skyrim Special Edition / Anniversary Edition
+- SKSE
+- Skyrim Together Reborn
+- A current `STRPluginMessagingAPI.dll` build exposing the STR bridge and Proxy Resolver
+- The same TradeTogether build on every player
+
+TradeTogether itself opens **no UDP socket** on this branch and requires no TradeTogether-specific port forwarding.
 
 ## Trade flow
 
-1. Both players install the same version of TradeTogether and connect to Skyrim Together Reborn.
-2. The requester targets the other character and presses **T**.
-3. The targeted player receives an **Accept / Refuse** prompt.
-4. After acceptance, the personal inventory opens for both players in offer-composition mode.
-5. Each player composes their offer:
+1. Both players connect through Skyrim Together Reborn.
+2. Target the other player's character and press **T**.
+3. The target receives an **Accept / Decline** MessageBox.
+4. Both players compose their offer in their personal inventory.
+5. **Insert** adds one selected item.
+6. **Delete** removes one selected item from the offer.
+7. **Numpad +/-** changes gold by 1 septim.
+8. **Shift + Numpad +/-** changes gold by 10 septims.
+9. **Ctrl + Numpad +/-** changes gold by 100 septims.
+10. **T** reviews the offers and opens the **Ready / Modify** summary MessageBox.
+11. **Tab** cancels the trade while composing the offer.
+12. After both players are ready, both receive the final **Confirm / Modify** MessageBox.
+13. After both confirmations, TradeTogether performs the automatic native transfer.
 
-   - **Insert**: add one unit of the selected item;
-   - **Delete**: remove one unit of the selected item;
-   - **Numpad + / -**: add or remove **1 septim**;
-   - **Shift + Numpad + / -**: add or remove **10 septims**;
-   - **Ctrl + Numpad + / -**: add or remove **100 septims**;
-   - **T**: display both offers and mark yourself as ready;
-   - **Tab**: cancel the entire trade.
+Quest items are rejected. Item-only, gold-only, mixed item/gold trades and one-way gifts are supported.
 
-   TradeTogether deliberately avoids **E** because Skyrim uses it to consume or activate inventory items, and avoids **A** because Skyrim uses it for inventory favorites by default.
+## Connected-player target validation
 
-6. Any item or gold change automatically clears the ready state.
-7. When both players are ready, each player sees both baskets and confirms one final time.
-8. After both confirmations, TradeTogether performs an invisible preflight and automatically transfers the offered items and septims.
+Starting with **v0.9.6-strpm**, TradeTogether uses STRPM's **Proxy Resolver**.
 
-Quest items are rejected. Gold is managed separately from normal item lines, so the Gold inventory entry cannot be added with Insert. An offer can contain up to 24 item lines and may contain only gold or even be empty, allowing one-way gifts.
+STRPM reports mappings between each connected player's `ConnectionID` and the local Skyrim FormID of that player's STR proxy. TradeTogether caches these mappings and resolves the displayed proxy name only from those mapped FormIDs.
 
-The initial request expires after 30 seconds, and an inactive session expires after 5 minutes.
+This means normal NPCs are rejected, while real STR proxies are sent through `TargetKind::kPlayer` with the non-zero `ConnectionID` required by the STR bridge.
 
-## English UI
+## Deferred STRPM receive path
 
-Starting with **v0.8.2**, user-facing TradeTogether notifications, trade summaries, prompts, validation errors and MessageBox buttons are displayed in English for the public Nexus Mods release. Internal protocol behavior is unchanged.
+Starting with **v0.9.8-strpm**, TradeTogether does not perform normal gameplay work directly from STRPM's receive callback.
 
-## Gold trading
+The callback only copies the incoming message into a preallocated ring buffer and returns. A dedicated dispatch thread performs parsing, logging and normal SKSE task scheduling afterwards.
 
-Gold is synchronized as a dedicated `gold` field in the trade state instead of being encoded as a normal `OfferLine`.
+## v0.10.0 — Skyrim Souls RE compatible MessageBoxes
 
-Before final confirmation, TradeTogether verifies that the local player still owns at least the promised amount. The offered septims are then transferred through Skyrim's native container-transfer path to the other player's STR proxy, just like normal stackable items.
+`v0.10.0-strpm` restores the complete MessageBox-based trade UI while changing how TradeTogether constructs and interacts with those menus.
 
-The amount is clamped between **0** and the player's currently available gold, so the offer cannot go negative or exceed the player's balance.
+### Native MessageBoxData defaults are preserved
 
-### v0.8.1 input fix
+Older STRPM test builds manually overwrote internal `MessageBoxData` fields after creating the data object. In particular, TradeTogether forced `unk48=0`, while current CommonLibSSE-NG defines the normal default as `10`.
 
-SkyUI / InventoryMenu does not consistently expose numpad `+` and `-` through the same raw `ButtonEvent` scan-code path used by the other trade keys. v0.8.1 reads the physical Windows `VK_ADD` / `VK_SUBTRACT` state with edge detection, while keeping the existing Skyrim input path for T, Insert, Delete and Tab.
+v0.10.0 no longer writes any of those internal fields. TradeTogether only supplies:
 
-Each detected gold-key press is written to `TradeTogether.log` at info level, including the resolved delta.
+- translated body text;
+- button labels;
+- the callback.
 
-## Native instance-aware item transfer
+The `MessageBoxData` object keeps the defaults initialized by Skyrim/CommonLib and is then queued normally.
 
-TradeTogether transfers the exact local inventory stack to Skyrim Together Reborn's proxy of the other player using Skyrim's native container-transfer path.
+This is important for compatibility with mods that alter `MessageBoxMenu` behavior, including **Skyrim Souls RE - Unpaused Menus**.
 
-When an item has an `ExtraDataList`, that exact list is supplied to `RemoveItem`. This is intended to preserve:
+### Skyrim Souls controls whether MessageBoxMenu pauses the game
 
-- smithing / tempering improvements;
-- custom or extra enchantments;
-- enchantment charge;
-- custom item names;
-- other per-instance data carried by Skyrim's native extra-data list.
+TradeTogether does not set or clear any `MessageBoxMenu` pause flags.
 
-Standard stackable objects without per-instance data are transferred as normal base stacks.
+If Skyrim Souls RE is installed with:
 
-TradeTogether identifies the active peer from the most recent trade-network packet, resolves the corresponding high-process actor by character name, and uses that STR proxy as the native transfer destination.
+```ini
+[UNPAUSED_MENUS]
+bMessageBoxMenu = true
+```
 
-### Current limitation
+TradeTogether still uses its normal MessageBoxes, while Skyrim Souls remains responsible for making `MessageBoxMenu` unpaused.
 
-If two different modified instances have the same base FormID **and the exact same display name**, Skyrim's inventory representation may not expose enough information to distinguish them perfectly. TradeTogether prefers matching `ExtraDataList` stacks before falling back to an unmodified base stack.
+TradeTogether detects `SkyrimSoulsRE.dll` at `kDataLoaded` only for diagnostics; the mod does not patch or configure Skyrim Souls.
 
-## Network
+### Trade hotkeys are suspended while MessageBoxMenu is open
 
-TradeTogether uses an independent UDP channel on port **27993**. Discovery is automatic on a local network. Both players must allow Skyrim through their private-network firewall.
+An unpaused MessageBox means the global TradeTogether input sink continues receiving keyboard events while the menu is on screen. v0.10.0 therefore ignores TradeTogether hotkeys whenever `MessageBoxMenu` is open.
 
-For a connection without LAN discovery, set `AutoDiscovery=0`, `PeerHost`, and `PeerPort` in `Data/SKSE/Plugins/TradeTogether.ini`. UDP port forwarding may be required depending on the router.
+This prevents keys intended for the MessageBox from also triggering background trade actions such as a new request, validation, cancellation, item editing or gold changes.
 
-Players are associated by their character name. The initial target may be any `Actor` other than the local player because STR does not expose a stable public SKSE API for formally identifying its remote actors.
+The MessageBox itself retains normal control of its buttons.
+
+## Native instance-aware transfer
+
+The STRPM branch uses the same automatic transfer code as the current main branch.
+
+TradeTogether transfers the actual local Skyrim inventory stack to the loaded STR proxy of the other player. When a selected item has an `ExtraDataList`, the original list is supplied to Skyrim's native `RemoveItem` transfer path.
+
+This is intended to preserve smithing improvements, enchantments, enchantment charge, custom names and other per-instance data stored by Skyrim. Gold uses Skyrim's native Gold form and follows the same native transfer path.
+
+## STR Plugin Messaging transport
+
+Channel:
+
+```text
+tradetogether.offer.v1
+```
+
+Trade packets keep the existing `TTNET|v1|...` payload format. STRPM messages are sent with **reliable + ordered** flags.
+
+Incoming packets cache the sender name and `ConnectionID`, while Proxy Resolver events maintain the authoritative local proxy FormID mappings.
+
+## Diagnostics
 
 The log is located at:
-`Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log`.
+
+```text
+Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
+```
+
+Expected startup entries include:
+
+```text
+TradeTogether v0.10.0-strpm loading
+MessageBox compatibility: SkyrimSoulsRE=detected pauseState=delegated-to-MessageBoxMenu creator dataDefaults=native
+TradeTogether STRPM deferred receive dispatcher started
+TradeTogether STRPM proxy mapped: connection=... form=...
+TradeTogether STRPM transport started: channel=tradetogether.offer.v1 ... mappedProxies=1 deferredReceive=1
+TradeTogether v0.10.0-strpm ready ... network=ready
+```
+
+When a MessageBox is created:
+
+```text
+SafeMessageBox queued with 2 button(s); native MessageBoxData defaults preserved
+```
+
+When an unpaused MessageBox is active and input events continue arriving:
+
+```text
+MessageBoxMenu opened; TradeTogether hotkeys suspended until it closes
+```
+
+After it closes:
+
+```text
+MessageBoxMenu closed; TradeTogether hotkeys resumed
+```
+
+A normal NPC or unavailable proxy instead produces:
+
+```text
+TradeTogether STRPM target is not a mapped player proxy: name="..." mappedProxies=...
+```
+
+## Release-build safeguards
+
+Starting with **v0.9.3-strpm**, `build_release.bat` forces a clean target rebuild, deletes the previously packaged DLL, explicitly copies the fresh DLL into `package/Data/SKSE/Plugins`, and verifies its version marker.
+
+Starting with **v0.9.4-strpm**, archive creation explicitly verifies that the ZIP exists after `Compress-Archive`.
+
+Starting with **v0.9.5-strpm**, the STRPM archive contains **only `package/Data`**, preventing stale UDP/FOMOD folders from entering the archive.
+
+## Current status
+
+`v0.10.0-strpm` is validated in a complete two-client STR trade flow, including the initial request MessageBox, offer composition, Ready / Modify summary, final Confirm / Modify prompt, and automatic item transfer. The Skyrim Souls RE compatibility fix was validated with `bMessageBoxMenu=true`, with the MessageBox remaining unpaused and no freeze observed.
 
 ## Build
 
@@ -89,8 +168,14 @@ The log is located at:
 .\build_release.bat
 ```
 
-The script builds the DLL, copies it together with the INI into the package, and creates:
+Expected archive:
 
 ```text
-dist/TradeTogether-v0.8.2-Vortex.zip
+dist/TradeTogether-v0.10.0-strpm-Vortex.zip
+```
+
+The archive root must contain only:
+
+```text
+Data/
 ```

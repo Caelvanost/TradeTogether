@@ -54,17 +54,15 @@ namespace RE
             data->buttonText.emplace_back(localizedSecondary.c_str());
         }
 
-        data->unk38 = 0;
-        data->unk3C = -1;
-        data->unk48 = 0;
-        data->unk4C = 0;
-        data->unk4D = 0;
-        data->unk4E = 0;
-        data->unk4F = 0;
+        // Do not overwrite MessageBoxData's internal fields. The game/factory
+        // initializes them with runtime-appropriate defaults (notably unk48=10
+        // in CommonLibSSE-NG). Keeping those defaults also lets Skyrim Souls RE
+        // apply its registered MessageBoxMenu creator and unpaused-menu flags
+        // normally instead of receiving hand-forged message data.
         data->callback.reset(a_callback);
 
-        spdlog::debug(
-            "SafeMessageBox queued with {} button(s)",
+        spdlog::info(
+            "SafeMessageBox queued with {} button(s); native MessageBoxData defaults preserved",
             data->buttonText.size());
         data->QueueMessage();
     }

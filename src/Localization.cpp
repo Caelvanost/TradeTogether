@@ -41,7 +41,7 @@ namespace TradeTogether::Localization
             { "TradeTogether: la cible de l'echange a change.", "TradeTogether: the trade target changed." },
             { "TradeTogether: confirmation reseau indisponible.", "TradeTogether: network confirmation unavailable." },
             { "TradeTogether: la cible n'a pas de nom reseau.", "TradeTogether: the target has no network name." },
-            { "TradeTogether: impossible d'envoyer la demande.", "TradeTogether: could not send the trade request." },
+            { "TradeTogether: impossible d'envoyer la demande.", "TradeTogether: invalid target. Target a connected player." },
             { "TradeTogether: aucune reponse, demande expiree.", "TradeTogether: no response, trade request expired." },
             { "TradeTogether: impossible de lire tes septims.", "TradeTogether: could not read your gold." },
             { "CONFIRMATION FINALE", "FINAL CONFIRMATION" },
