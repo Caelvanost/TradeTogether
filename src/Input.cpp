@@ -20,7 +20,7 @@ namespace TradeTogether
 
         inputManager->AddEventSink(GetSingleton());
         spdlog::info(
-            "Input event sink registered (T=request/validate/accept, Insert=add, Delete=remove, Numpad +/-=gold, Tab=cancel/decline)");
+            "Input event sink registered (T=request/validate, Insert=add, Delete=remove, Numpad +/-=gold, Tab=cancel; MessageBoxMenu input isolated)");
     }
 
     RE::BSEventNotifyControl InputEventSink::ProcessEvent(
@@ -36,9 +36,32 @@ namespace TradeTogether
         // the latch is reset without generating repeated gold changes.
         static bool addWasDown = false;
         static bool subtractWasDown = false;
+        static bool messageBoxWasOpen = false;
 
         const bool addDown = (GetAsyncKeyState(VK_ADD) & 0x8000) != 0;
         const bool subtractDown = (GetAsyncKeyState(VK_SUBTRACT) & 0x8000) != 0;
+
+        // Skyrim Souls RE deliberately lets MessageBoxMenu run while the game is
+        // unpaused. In that configuration our global input sink also continues
+        // receiving keyboard events. Never let a key intended for the message
+        // box trigger a TradeTogether action behind it.
+        const auto* ui = RE::UI::GetSingleton();
+        const bool messageBoxOpen =
+            ui && ui->IsMenuOpen(RE::MessageBoxMenu::MENU_NAME);
+        if (messageBoxOpen) {
+            if (!messageBoxWasOpen) {
+                spdlog::debug(
+                    "MessageBoxMenu opened; TradeTogether hotkeys suspended until it closes");
+            }
+            messageBoxWasOpen = true;
+            addWasDown = addDown;
+            subtractWasDown = subtractDown;
+            return RE::BSEventNotifyControl::kContinue;
+        }
+        if (messageBoxWasOpen) {
+            spdlog::debug("MessageBoxMenu closed; TradeTogether hotkeys resumed");
+            messageBoxWasOpen = false;
+        }
 
         if ((addDown && !addWasDown) ||
             (subtractDown && !subtractWasDown)) {
@@ -72,17 +95,6 @@ namespace TradeTogether
             }
 
             const auto scanCode = button->GetIDCode();
-
-            // Incoming network requests deliberately avoid Skyrim's modal
-            // MessageBoxData path on the STRPM branch. Consume T/Tab here before
-            // those keys can also trigger the normal Trade::HandleKey actions.
-            if (SafeMessageBox::HandleKey(scanCode)) {
-                spdlog::debug(
-                    "Trade incoming prompt key handled: DIK 0x{:02X}",
-                    scanCode);
-                break;
-            }
-
             if (scanCode == kTScanCode) {
                 spdlog::debug("Trade key pressed: T / DIK 0x{:02X}", scanCode);
                 Trade::HandleKey(kTradeActionCode);
