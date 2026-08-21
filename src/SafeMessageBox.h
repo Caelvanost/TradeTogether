@@ -1,5 +1,14 @@
 #pragma once
 
+namespace TradeTogether::SafeMessageBox
+{
+    // Incoming trade requests use a non-modal notification prompt on the STRPM
+    // branch. T accepts and Tab declines. Other TradeTogether message boxes keep
+    // using Skyrim's normal MessageBoxData path.
+    bool HandleKey(std::uint32_t a_scanCode);
+    void ClearNonModalPrompt();
+}
+
 namespace RE
 {
     void SafeCreateMessage(
