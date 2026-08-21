@@ -20,7 +20,7 @@ namespace TradeTogether
 
         inputManager->AddEventSink(GetSingleton());
         spdlog::info(
-            "Input event sink registered (T=request/validate, Insert=add, Delete=remove, Numpad +/-=gold, Tab=cancel)");
+            "Input event sink registered (T=request/validate/accept, Insert=add, Delete=remove, Numpad +/-=gold, Tab=cancel/decline)");
     }
 
     RE::BSEventNotifyControl InputEventSink::ProcessEvent(
@@ -72,6 +72,17 @@ namespace TradeTogether
             }
 
             const auto scanCode = button->GetIDCode();
+
+            // Incoming network requests deliberately avoid Skyrim's modal
+            // MessageBoxData path on the STRPM branch. Consume T/Tab here before
+            // those keys can also trigger the normal Trade::HandleKey actions.
+            if (SafeMessageBox::HandleKey(scanCode)) {
+                spdlog::debug(
+                    "Trade incoming prompt key handled: DIK 0x{:02X}",
+                    scanCode);
+                break;
+            }
+
             if (scanCode == kTScanCode) {
                 spdlog::debug("Trade key pressed: T / DIK 0x{:02X}", scanCode);
                 Trade::HandleKey(kTradeActionCode);
