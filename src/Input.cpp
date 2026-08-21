@@ -45,7 +45,7 @@ namespace TradeTogether
         // unpaused. In that configuration our global input sink also continues
         // receiving keyboard events. Never let a key intended for the message
         // box trigger a TradeTogether action behind it.
-        const auto* ui = RE::UI::GetSingleton();
+        auto* ui = RE::UI::GetSingleton();
         const bool messageBoxOpen =
             ui && ui->IsMenuOpen(RE::MessageBoxMenu::MENU_NAME);
         if (messageBoxOpen) {
