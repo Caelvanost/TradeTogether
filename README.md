@@ -160,7 +160,7 @@ Starting with **v0.9.5-strpm**, the STRPM archive contains **only `package/Data`
 
 ## Current status
 
-`v0.10.0-strpm` is a compatibility test build for the MessageBox freeze observed with Skyrim Souls RE. It restores the complete MessageBox UI and removes TradeTogether's manual internal `MessageBoxData` overrides. Runtime validation is still required.
+`v0.10.0-strpm` is validated in a complete two-client STR trade flow, including the initial request MessageBox, offer composition, Ready / Modify summary, final Confirm / Modify prompt, and automatic item transfer. The Skyrim Souls RE compatibility fix was validated with `bMessageBoxMenu=true`, with the MessageBox remaining unpaused and no freeze observed.
 
 ## Build
 
