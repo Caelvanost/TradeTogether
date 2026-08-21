@@ -28,15 +28,20 @@ namespace
         }
 
         if (a_message->type == SKSE::MessagingInterface::kDataLoaded) {
+            const bool skyrimSoulsLoaded =
+                GetModuleHandleW(L"SkyrimSoulsRE.dll") != nullptr;
+            spdlog::info(
+                "MessageBox compatibility: SkyrimSoulsRE={} pauseState=delegated-to-MessageBoxMenu creator dataDefaults=native",
+                skyrimSoulsLoaded ? "detected" : "not-detected");
+
             TradeTogether::InputEventSink::GetSingleton()->Register();
             const auto networkReady = TradeTogether::Trade::Initialize();
             spdlog::info(
-                "TradeTogether v0.9.10-strpm ready - STR Plugin Messaging, item and gold trading, English UI network={}",
+                "TradeTogether v0.10.0-strpm ready - STR Plugin Messaging, item and gold trading, English UI network={}",
                 networkReady ? "ready" : "unavailable");
         } else if (
             a_message->type == SKSE::MessagingInterface::kPreLoadGame ||
             a_message->type == SKSE::MessagingInterface::kNewGame) {
-            TradeTogether::SafeMessageBox::ClearNonModalPrompt();
             TradeTogether::Trade::Reset();
         }
     }
@@ -47,7 +52,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
     SKSE::Init(a_skse);
     SetupLog();
 
-    spdlog::info("TradeTogether v0.9.10-strpm loading");
+    spdlog::info("TradeTogether v0.10.0-strpm loading");
 
     auto* messaging = SKSE::GetMessagingInterface();
     if (!messaging) {
