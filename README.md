@@ -1,4 +1,4 @@
-# TradeTogether v0.9.10-strpm
+# TradeTogether v0.10.0-strpm
 
 STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
@@ -18,16 +18,16 @@ TradeTogether itself opens **no UDP socket** on this branch and requires no Trad
 
 1. Both players connect through Skyrim Together Reborn.
 2. Target the other player's character and press **T**.
-3. The target receives a non-modal notification: **T = Accept**, **Tab = Decline**.
+3. The target receives an **Accept / Decline** MessageBox.
 4. Both players compose their offer in their personal inventory.
 5. **Insert** adds one selected item.
 6. **Delete** removes one selected item from the offer.
 7. **Numpad +/-** changes gold by 1 septim.
 8. **Shift + Numpad +/-** changes gold by 10 septims.
 9. **Ctrl + Numpad +/-** changes gold by 100 septims.
-10. **T** reviews the offers and marks the local player ready.
-11. **Tab** cancels the trade.
-12. After both players are ready, both receive the final **Confirm / Modify** prompt.
+10. **T** reviews the offers and opens the **Ready / Modify** summary MessageBox.
+11. **Tab** cancels the trade while composing the offer.
+12. After both players are ready, both receive the final **Confirm / Modify** MessageBox.
 13. After both confirmations, TradeTogether performs the automatic native transfer.
 
 Quest items are rejected. Item-only, gold-only, mixed item/gold trades and one-way gifts are supported.
@@ -42,32 +42,50 @@ This means normal NPCs are rejected, while real STR proxies are sent through `Ta
 
 ## Deferred STRPM receive path
 
-Starting with **v0.9.8-strpm**, TradeTogether no longer performs normal gameplay work directly from STRPM's receive callback.
+Starting with **v0.9.8-strpm**, TradeTogether does not perform normal gameplay work directly from STRPM's receive callback.
 
-The callback only copies the incoming message into a preallocated 32-slot ring buffer and returns. A dedicated dispatch thread performs parsing, logging and normal SKSE task scheduling afterwards.
+The callback only copies the incoming message into a preallocated ring buffer and returns. A dedicated dispatch thread performs parsing, logging and normal SKSE task scheduling afterwards.
 
-Expected startup diagnostics include:
+## v0.10.0 — Skyrim Souls RE compatible MessageBoxes
 
-```text
-TradeTogether STRPM deferred receive dispatcher started
-TradeTogether STRPM transport started: ... deferredReceive=1
+`v0.10.0-strpm` restores the complete MessageBox-based trade UI while changing how TradeTogether constructs and interacts with those menus.
+
+### Native MessageBoxData defaults are preserved
+
+Older STRPM test builds manually overwrote internal `MessageBoxData` fields after creating the data object. In particular, TradeTogether forced `unk48=0`, while current CommonLibSSE-NG defines the normal default as `10`.
+
+v0.10.0 no longer writes any of those internal fields. TradeTogether only supplies:
+
+- translated body text;
+- button labels;
+- the callback.
+
+The `MessageBoxData` object keeps the defaults initialized by Skyrim/CommonLib and is then queued normally.
+
+This is important for compatibility with mods that alter `MessageBoxMenu` behavior, including **Skyrim Souls RE - Unpaused Menus**.
+
+### Skyrim Souls controls whether MessageBoxMenu pauses the game
+
+TradeTogether does not set or clear any `MessageBoxMenu` pause flags.
+
+If Skyrim Souls RE is installed with:
+
+```ini
+[UNPAUSED_MENUS]
+bMessageBoxMenu = true
 ```
 
-## Incoming request freeze workaround
+TradeTogether still uses its normal MessageBoxes, while Skyrim Souls remains responsible for making `MessageBoxMenu` unpaused.
 
-Runtime tests with STRPM showed that the transport remains healthy after a TradeTogether request is delivered, while the receiving game freezes when TradeTogether queues the initial `MessageBoxData` Accept/Decline dialog.
+TradeTogether detects `SkyrimSoulsRE.dll` at `kDataLoaded` only for diagnostics; the mod does not patch or configure Skyrim Souls.
 
-**v0.9.10-strpm** therefore removes only that initial network request from Skyrim's modal message-box pipeline.
+### Trade hotkeys are suspended while MessageBoxMenu is open
 
-Incoming requests now use a non-modal notification:
+An unpaused MessageBox means the global TradeTogether input sink continues receiving keyboard events while the menu is on screen. v0.10.0 therefore ignores TradeTogether hotkeys whenever `MessageBoxMenu` is open.
 
-```text
-<Player> wants to trade with you. Accept and compose your offer? [T] Accept | [Tab] Decline
-```
+This prevents keys intended for the MessageBox from also triggering background trade actions such as a new request, validation, cancellation, item editing or gold changes.
 
-The input sink consumes T/Tab before the normal trade hotkeys while this request is pending and invokes the existing `TradePromptCallback` directly. The request timeout and normal `RESPONSE` protocol remain unchanged.
-
-Offer-summary and final-confirmation dialogs are intentionally unchanged in this build so the initial receiver freeze can be isolated without redesigning the complete trade UI.
+The MessageBox itself retains normal control of its buttons.
 
 ## Native instance-aware transfer
 
@@ -100,38 +118,30 @@ Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
 Expected startup entries include:
 
 ```text
-TradeTogether v0.9.10-strpm loading
+TradeTogether v0.10.0-strpm loading
+MessageBox compatibility: SkyrimSoulsRE=detected pauseState=delegated-to-MessageBoxMenu creator dataDefaults=native
 TradeTogether STRPM deferred receive dispatcher started
 TradeTogether STRPM proxy mapped: connection=... form=...
 TradeTogether STRPM transport started: channel=tradetogether.offer.v1 ... mappedProxies=1 deferredReceive=1
-TradeTogether STRPM status startup: backend=STRBridge ... mappedProxies=1
-TradeTogether v0.9.10-strpm ready ... network=ready
+TradeTogether v0.10.0-strpm ready ... network=ready
 ```
 
-When a targeted proxy is resolved successfully:
+When a MessageBox is created:
 
 ```text
-TradeTogether STRPM resolved player proxy: name="..." connection=... form=...
-TradeTogether STRPM packet sent: target="..." connection=... bytes=...
+SafeMessageBox queued with 2 button(s); native MessageBoxData defaults preserved
 ```
 
-On the receiver, the initial request should now log:
+When an unpaused MessageBox is active and input events continue arriving:
 
 ```text
-SafeMessageBox incoming trade prompt displayed non-modally: T=accept Tab=decline
-Trade confirmation displayed: ...
+MessageBoxMenu opened; TradeTogether hotkeys suspended until it closes
 ```
 
-Accepting or declining should then log:
+After it closes:
 
 ```text
-SafeMessageBox non-modal incoming trade response: accept
-```
-
-or:
-
-```text
-SafeMessageBox non-modal incoming trade response: decline
+MessageBoxMenu closed; TradeTogether hotkeys resumed
 ```
 
 A normal NPC or unavailable proxy instead produces:
@@ -150,7 +160,7 @@ Starting with **v0.9.5-strpm**, the STRPM archive contains **only `package/Data`
 
 ## Current status
 
-`v0.9.10-strpm` is an STRPM test build focused on isolating the receiver freeze. Proxy Resolver targeting and deferred STRPM reception remain unchanged; only the initial incoming Accept/Decline dialog is non-modal.
+`v0.10.0-strpm` is a compatibility test build for the MessageBox freeze observed with Skyrim Souls RE. It restores the complete MessageBox UI and removes TradeTogether's manual internal `MessageBoxData` overrides. Runtime validation is still required.
 
 ## Build
 
@@ -161,7 +171,7 @@ Starting with **v0.9.5-strpm**, the STRPM archive contains **only `package/Data`
 Expected archive:
 
 ```text
-dist/TradeTogether-v0.9.10-strpm-Vortex.zip
+dist/TradeTogether-v0.10.0-strpm-Vortex.zip
 ```
 
 The archive root must contain only:
