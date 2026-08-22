@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 set "TRADETOGETHER_BUILD_DIR=out\build-release"
-set "TRADETOGETHER_VERSION=0.10.0-strpm"
+set "TRADETOGETHER_VERSION=0.11.0-strpm"
 set "TRADETOGETHER_BUILT_DLL=%TRADETOGETHER_BUILD_DIR%\Release\TradeTogether.dll"
 set "TRADETOGETHER_PACKAGE_DLL=package\Data\SKSE\Plugins\TradeTogether.dll"
 
@@ -52,6 +52,9 @@ if errorlevel 1 exit /b %errorlevel%
 echo.
 echo [TradeTogether] Build termine.
 echo DLL: %TRADETOGETHER_PACKAGE_DLL%
+echo.
+echo [TradeTogether] NOTE: run build_mcm.bat and ensure TradeTogetherMCM.esp is present
+ echo before creating a public package with the MCM.
 
 echo.
 call "%~dp0make_vortex_archive.bat"
@@ -59,5 +62,5 @@ if errorlevel 1 exit /b %errorlevel%
 
 echo.
 echo [TradeTogether] Tout est pret.
-echo Archive Vortex: dist\TradeTogether-v0.10.0-strpm-Vortex.zip
+echo Archive Vortex: dist\TradeTogether-v0.11.0-strpm-Vortex.zip
 endlocal
