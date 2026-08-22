@@ -1,4 +1,5 @@
 #include "PCH.h"
+#include "Config.h"
 #include "Input.h"
 #include "Trade.h"
 
@@ -10,6 +11,26 @@ namespace TradeTogether
         return std::addressof(singleton);
     }
 
+    void InputEventSink::ReloadConfig()
+    {
+        const auto config = Config::Load();
+        _tradeKey.store(config.tradeKey, std::memory_order_relaxed);
+        _addItemKey.store(config.addItemKey, std::memory_order_relaxed);
+        _removeItemKey.store(config.removeItemKey, std::memory_order_relaxed);
+        _goldAddKey.store(config.goldAddKey, std::memory_order_relaxed);
+        _goldRemoveKey.store(config.goldRemoveKey, std::memory_order_relaxed);
+        _cancelKey.store(config.cancelKey, std::memory_order_relaxed);
+
+        spdlog::info(
+            "TradeTogether controls loaded: trade=0x{:02X} add=0x{:02X} remove=0x{:02X} goldAdd=0x{:02X} goldRemove=0x{:02X} cancel=0x{:02X}",
+            config.tradeKey,
+            config.addItemKey,
+            config.removeItemKey,
+            config.goldAddKey,
+            config.goldRemoveKey,
+            config.cancelKey);
+    }
+
     void InputEventSink::Register()
     {
         auto* inputManager = RE::BSInputDeviceManager::GetSingleton();
@@ -18,9 +39,10 @@ namespace TradeTogether
             return;
         }
 
+        ReloadConfig();
         inputManager->AddEventSink(GetSingleton());
         spdlog::info(
-            "Input event sink registered (T=request/validate, Insert=add, Delete=remove, Numpad +/-=gold, Tab=cancel; MessageBoxMenu input isolated)");
+            "Input event sink registered with configurable key bindings; MessageBoxMenu input isolated");
     }
 
     RE::BSEventNotifyControl InputEventSink::ProcessEvent(
@@ -29,22 +51,31 @@ namespace TradeTogether
     {
         Trade::Update();
 
-        // SkyUI / InventoryMenu does not consistently expose the numpad +/-
-        // keys through ButtonEvent::GetIDCode(). Read their physical Windows
-        // virtual-key state directly and trigger only on the transition from
-        // released to pressed. Release events still pass through this sink, so
-        // the latch is reset without generating repeated gold changes.
         static bool addWasDown = false;
         static bool subtractWasDown = false;
         static bool messageBoxWasOpen = false;
 
-        const bool addDown = (GetAsyncKeyState(VK_ADD) & 0x8000) != 0;
-        const bool subtractDown = (GetAsyncKeyState(VK_SUBTRACT) & 0x8000) != 0;
+        const auto tradeKey = _tradeKey.load(std::memory_order_relaxed);
+        const auto addItemKey = _addItemKey.load(std::memory_order_relaxed);
+        const auto removeItemKey = _removeItemKey.load(std::memory_order_relaxed);
+        const auto goldAddKey = _goldAddKey.load(std::memory_order_relaxed);
+        const auto goldRemoveKey = _goldRemoveKey.load(std::memory_order_relaxed);
+        const auto cancelKey = _cancelKey.load(std::memory_order_relaxed);
+
+        // Numpad +/- are a special case: SkyUI/InventoryMenu does not always
+        // expose them through ButtonEvent. Preserve the proven Win32 edge
+        // detection path whenever either gold action is actually bound to the
+        // traditional numpad key. Any other MCM-selected key uses ButtonEvent.
+        const bool pollNumpadAdd = goldAddKey == 0x4E;
+        const bool pollNumpadSubtract = goldRemoveKey == 0x4A;
+        const bool addDown = pollNumpadAdd &&
+            (GetAsyncKeyState(VK_ADD) & 0x8000) != 0;
+        const bool subtractDown = pollNumpadSubtract &&
+            (GetAsyncKeyState(VK_SUBTRACT) & 0x8000) != 0;
 
         // Skyrim Souls RE deliberately lets MessageBoxMenu run while the game is
-        // unpaused. In that configuration our global input sink also continues
-        // receiving keyboard events. Never let a key intended for the message
-        // box trigger a TradeTogether action behind it.
+        // unpaused. Never let a key intended for a MessageBox trigger a trade
+        // action behind it.
         auto* ui = RE::UI::GetSingleton();
         const bool messageBoxOpen =
             ui && ui->IsMenuOpen(RE::MessageBoxMenu::MENU_NAME);
@@ -71,8 +102,7 @@ namespace TradeTogether
             const std::int32_t delta = addDown && !addWasDown ? step : -step;
 
             spdlog::info(
-                "Trade gold key pressed: source=Win32 key={} delta={}",
-                delta > 0 ? "VK_ADD" : "VK_SUBTRACT",
+                "Trade gold key pressed: source=Win32 numpad delta={}",
                 delta);
             Trade::AdjustGold(delta);
         }
@@ -95,22 +125,60 @@ namespace TradeTogether
             }
 
             const auto scanCode = button->GetIDCode();
-            if (scanCode == kTScanCode) {
-                spdlog::debug("Trade key pressed: T / DIK 0x{:02X}", scanCode);
+
+            if (scanCode == tradeKey) {
+                spdlog::debug(
+                    "Trade request/validate key pressed: DIK 0x{:02X}",
+                    scanCode);
                 Trade::HandleKey(kTradeActionCode);
                 break;
             }
 
-            if (scanCode == kInsertScanCode) {
-                spdlog::debug("Trade add key pressed: Insert / DIK 0x{:02X}", scanCode);
+            if (scanCode == addItemKey) {
+                spdlog::debug(
+                    "Trade add-item key pressed: DIK 0x{:02X}",
+                    scanCode);
                 Trade::HandleKey(kAddActionCode);
                 break;
             }
 
-            if (scanCode == kDeleteScanCode ||
-                scanCode == kTabScanCode) {
-                spdlog::debug("Trade key pressed: DIK 0x{:02X}", scanCode);
-                Trade::HandleKey(scanCode);
+            if (scanCode == removeItemKey) {
+                spdlog::debug(
+                    "Trade remove-item key pressed: DIK 0x{:02X}",
+                    scanCode);
+                Trade::HandleKey(kRemoveActionCode);
+                break;
+            }
+
+            if (scanCode == cancelKey) {
+                spdlog::debug(
+                    "Trade cancel key pressed: DIK 0x{:02X}",
+                    scanCode);
+                Trade::HandleKey(kCancelActionCode);
+                break;
+            }
+
+            // Do not double-handle the legacy numpad bindings: those are
+            // intentionally handled above through GetAsyncKeyState.
+            if (scanCode == goldAddKey && !pollNumpadAdd) {
+                const bool control = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+                const bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+                const std::int32_t step = control ? 100 : (shift ? 10 : 1);
+                spdlog::info(
+                    "Trade gold key pressed: source=ButtonEvent action=add delta={}",
+                    step);
+                Trade::AdjustGold(step);
+                break;
+            }
+
+            if (scanCode == goldRemoveKey && !pollNumpadSubtract) {
+                const bool control = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+                const bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+                const std::int32_t step = control ? 100 : (shift ? 10 : 1);
+                spdlog::info(
+                    "Trade gold key pressed: source=ButtonEvent action=remove delta={}",
+                    -step);
+                Trade::AdjustGold(-step);
                 break;
             }
         }
