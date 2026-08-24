@@ -3,6 +3,7 @@ setlocal
 cd /d "%~dp0"
 set "TRADETOGETHER_BUILD_DIR=out\build-release"
 set "TRADETOGETHER_VERSION=0.11.0-strpm"
+set "TRADETOGETHER_PUBLIC_VERSION=0.11.0"
 set "TRADETOGETHER_BUILT_DLL=%TRADETOGETHER_BUILD_DIR%\Release\TradeTogether.dll"
 set "TRADETOGETHER_PACKAGE_DLL=package\Data\SKSE\Plugins\TradeTogether.dll"
 
@@ -62,5 +63,5 @@ if errorlevel 1 exit /b %errorlevel%
 
 echo.
 echo [TradeTogether] Tout est pret.
-echo Archive Vortex: dist\TradeTogether-v0.11.0-strpm-Vortex.zip
+echo Archive: dist\TradeTogether-%TRADETOGETHER_PUBLIC_VERSION%.zip
 endlocal
