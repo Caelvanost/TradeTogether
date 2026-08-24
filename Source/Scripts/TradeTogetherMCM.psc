@@ -34,49 +34,49 @@ Event OnPageReset(string page)
 EndEvent
 
 Event OnOptionKeyMapChange(int option, int keyCode, string conflictControl, string conflictName)
-    string action = ""
+    string bindingName = ""
 
     if option == tradeOID
-        action = "Trade"
+        bindingName = "Trade"
     elseif option == addItemOID
-        action = "AddItem"
+        bindingName = "AddItem"
     elseif option == removeItemOID
-        action = "RemoveItem"
+        bindingName = "RemoveItem"
     elseif option == goldAddOID
-        action = "GoldAdd"
+        bindingName = "GoldAdd"
     elseif option == goldRemoveOID
-        action = "GoldRemove"
+        bindingName = "GoldRemove"
     elseif option == cancelOID
-        action = "Cancel"
+        bindingName = "Cancel"
     endif
 
-    if action != ""
-        if TradeTogetherNative.SetKey(action, keyCode)
+    if bindingName != ""
+        if TradeTogetherNative.SetKey(bindingName, keyCode)
             SetKeyMapOptionValue(option, keyCode)
         endif
     endif
 EndEvent
 
 Event OnOptionDefault(int option)
-    string action = ""
+    string bindingName = ""
 
     if option == tradeOID
-        action = "Trade"
+        bindingName = "Trade"
     elseif option == addItemOID
-        action = "AddItem"
+        bindingName = "AddItem"
     elseif option == removeItemOID
-        action = "RemoveItem"
+        bindingName = "RemoveItem"
     elseif option == goldAddOID
-        action = "GoldAdd"
+        bindingName = "GoldAdd"
     elseif option == goldRemoveOID
-        action = "GoldRemove"
+        bindingName = "GoldRemove"
     elseif option == cancelOID
-        action = "Cancel"
+        bindingName = "Cancel"
     endif
 
-    if action != ""
-        int keyCode = TradeTogetherNative.GetDefaultKey(action)
-        if TradeTogetherNative.SetKey(action, keyCode)
+    if bindingName != ""
+        int keyCode = TradeTogetherNative.GetDefaultKey(bindingName)
+        if TradeTogetherNative.SetKey(bindingName, keyCode)
             SetKeyMapOptionValue(option, keyCode)
         endif
     endif
