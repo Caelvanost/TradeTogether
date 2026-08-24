@@ -1,6 +1,6 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.10.0-strpm"
+    [string]$Version = "0.11.0-strpm"
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,6 +20,9 @@ $dataDir = Join-Path $packageDir "Data"
 $pluginDir = Join-Path $dataDir "SKSE\Plugins"
 $dllPath = Join-Path $pluginDir "TradeTogether.dll"
 $iniPath = Join-Path $pluginDir "TradeTogether.ini"
+$mcmPluginPath = Join-Path $dataDir "TradeTogetherMCM.esp"
+$mcmNativeScript = Join-Path $dataDir "Scripts\TradeTogetherNative.pex"
+$mcmMenuScript = Join-Path $dataDir "Scripts\TradeTogetherMCM.pex"
 $distDir = Join-Path $ProjectRoot "dist"
 $archivePath = Join-Path $distDir ("TradeTogether-v{0}-Vortex.zip" -f $Version)
 $verifyScript = Join-Path $PSScriptRoot "verify_release_dll.ps1"
@@ -33,9 +36,17 @@ if (-not (Test-Path -LiteralPath $iniPath -PathType Leaf)) {
 
 & $verifyScript -DllPath $dllPath -ExpectedVersion $Version
 
-# The same working tree is also used by the UDP branch. Git does not remove
-# untracked package directories when switching branches, so old FOMOD folders
-# such as "00 Core" may remain locally. They must never enter an STRPM archive.
+if (-not (Test-Path -LiteralPath $mcmPluginPath -PathType Leaf)) {
+    Write-Warning "TradeTogetherMCM.esp is missing; archive will not contain the MCM registration quest."
+}
+if (-not (Test-Path -LiteralPath $mcmNativeScript -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $mcmMenuScript -PathType Leaf)) {
+    Write-Warning "Compiled MCM Papyrus scripts are missing. Run build_mcm.bat before a public MCM release."
+}
+
+# The same working tree is also used by the historical UDP branches. Git does
+# not remove untracked package directories when switching branches, so old
+# FOMOD folders must never enter a current STRPM archive.
 $legacyEntries = @("00 Core", "10 LAN", "20 Remote Host", "30 Remote Client", "fomod")
 $foundLegacyEntries = @()
 foreach ($entry in $legacyEntries) {
@@ -53,8 +64,6 @@ if (Test-Path -LiteralPath $archivePath) {
     Remove-Item -LiteralPath $archivePath -Force
 }
 
-# STRPM is a simple Vortex package. Archive only the Data directory instead of
-# package\* so stale folders from another branch cannot be shipped accidentally.
 Compress-Archive `
     -Path $dataDir `
     -DestinationPath $archivePath `

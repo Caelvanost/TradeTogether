@@ -88,6 +88,37 @@ namespace TradeTogether
             return value > 0 && value <= 65535 ?
                 static_cast<std::uint16_t>(value) : a_fallback;
         }
+
+        std::uint32_t ReadScanCode(
+            const wchar_t* a_key,
+            std::uint32_t a_fallback)
+        {
+            const auto value = ReadUInt(L"Controls", a_key, a_fallback);
+            return value <= 0xFF ? value : a_fallback;
+        }
+
+        const wchar_t* ControlIniKey(std::string_view a_action)
+        {
+            if (a_action == "Trade") {
+                return L"TradeKey";
+            }
+            if (a_action == "AddItem") {
+                return L"AddItemKey";
+            }
+            if (a_action == "RemoveItem") {
+                return L"RemoveItemKey";
+            }
+            if (a_action == "GoldAdd") {
+                return L"GoldAddKey";
+            }
+            if (a_action == "GoldRemove") {
+                return L"GoldRemoveKey";
+            }
+            if (a_action == "Cancel") {
+                return L"CancelKey";
+            }
+            return nullptr;
+        }
     }
 
     Config Config::Load()
@@ -133,6 +164,54 @@ namespace TradeTogether
             60000U,
             1800000U);
 
+        config.tradeKey = ReadScanCode(L"TradeKey", config.tradeKey);
+        config.addItemKey = ReadScanCode(L"AddItemKey", config.addItemKey);
+        config.removeItemKey = ReadScanCode(L"RemoveItemKey", config.removeItemKey);
+        config.goldAddKey = ReadScanCode(L"GoldAddKey", config.goldAddKey);
+        config.goldRemoveKey = ReadScanCode(L"GoldRemoveKey", config.goldRemoveKey);
+        config.cancelKey = ReadScanCode(L"CancelKey", config.cancelKey);
+
         return config;
+    }
+
+    bool Config::WriteControlKey(
+        std::string_view a_action,
+        std::uint32_t a_scanCode)
+    {
+        const auto* key = ControlIniKey(a_action);
+        if (!key || a_scanCode > 0xFF) {
+            return false;
+        }
+
+        const auto value = std::to_wstring(a_scanCode);
+        return WritePrivateProfileStringW(
+                   L"Controls",
+                   key,
+                   value.c_str(),
+                   kIniPath) != FALSE;
+    }
+
+    std::uint32_t Config::DefaultControlKey(std::string_view a_action)
+    {
+        const Config defaults{};
+        if (a_action == "Trade") {
+            return defaults.tradeKey;
+        }
+        if (a_action == "AddItem") {
+            return defaults.addItemKey;
+        }
+        if (a_action == "RemoveItem") {
+            return defaults.removeItemKey;
+        }
+        if (a_action == "GoldAdd") {
+            return defaults.goldAddKey;
+        }
+        if (a_action == "GoldRemove") {
+            return defaults.goldRemoveKey;
+        }
+        if (a_action == "Cancel") {
+            return defaults.cancelKey;
+        }
+        return 0;
     }
 }

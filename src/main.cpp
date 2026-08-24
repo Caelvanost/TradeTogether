@@ -1,5 +1,6 @@
 #include "PCH.h"
 #include "Input.h"
+#include "MCMBridge.h"
 #include "Trade.h"
 
 namespace
@@ -37,7 +38,7 @@ namespace
             TradeTogether::InputEventSink::GetSingleton()->Register();
             const auto networkReady = TradeTogether::Trade::Initialize();
             spdlog::info(
-                "TradeTogether v0.10.0-strpm ready - STR Plugin Messaging, item and gold trading, English UI network={}",
+                "TradeTogether v0.11.0-strpm ready - STR Plugin Messaging, configurable controls, item and gold trading network={}",
                 networkReady ? "ready" : "unavailable");
         } else if (
             a_message->type == SKSE::MessagingInterface::kPreLoadGame ||
@@ -52,7 +53,13 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
     SKSE::Init(a_skse);
     SetupLog();
 
-    spdlog::info("TradeTogether v0.10.0-strpm loading");
+    spdlog::info("TradeTogether v0.11.0-strpm loading");
+
+    auto* papyrus = SKSE::GetPapyrusInterface();
+    if (!papyrus || !papyrus->Register(TradeTogether::MCMBridge::Register)) {
+        spdlog::critical("Could not register TradeTogether Papyrus/MCM bridge");
+        return false;
+    }
 
     auto* messaging = SKSE::GetMessagingInterface();
     if (!messaging) {
