@@ -178,7 +178,7 @@ TradeTogether controls loaded: ...
 
 ## Current status
 
-`v0.11.0-strpm` includes the configurable-control system, native Papyrus bridge and SkyUI MCM. The C++ plugin and both Papyrus scripts compile successfully, the lightweight `TradeTogetherMCM.esp` is packaged, and the v0.11.0 Vortex archive is generated successfully.
+`v0.11.0-strpm` includes the configurable-control system, native Papyrus bridge and SkyUI MCM. The C++ plugin and both Papyrus scripts compile successfully, the lightweight `TradeTogetherMCM.esp` is packaged, and the v0.11.0 archive is generated successfully.
 
 The existing v0.10.0 STR trade flow and Skyrim Souls RE compatibility remain the validated gameplay baseline carried forward by this release.
 
@@ -200,5 +200,5 @@ set "SKYUI_SOURCE=C:\path\to\SkyUI\scripts\source"
 Expected archive name:
 
 ```text
-dist/TradeTogether-v0.11.0-strpm-Vortex.zip
+dist/TradeTogether-0.11.0.zip
 ```

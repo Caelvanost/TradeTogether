@@ -24,7 +24,11 @@ $mcmPluginPath = Join-Path $dataDir "TradeTogetherMCM.esp"
 $mcmNativeScript = Join-Path $dataDir "Scripts\TradeTogetherNative.pex"
 $mcmMenuScript = Join-Path $dataDir "Scripts\TradeTogetherMCM.pex"
 $distDir = Join-Path $ProjectRoot "dist"
-$archivePath = Join-Path $distDir ("TradeTogether-v{0}-Vortex.zip" -f $Version)
+
+# Keep the internal build marker (for example 0.11.0-strpm) for DLL
+# verification, but expose a clean public archive name.
+$publicVersion = $Version -replace '-strpm$', ''
+$archivePath = Join-Path $distDir ("TradeTogether-{0}.zip" -f $publicVersion)
 $verifyScript = Join-Path $PSScriptRoot "verify_release_dll.ps1"
 
 if (-not (Test-Path -LiteralPath $dllPath -PathType Leaf)) {
@@ -74,5 +78,5 @@ if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
     throw "Archive creation failed: $archivePath"
 }
 
-Write-Host "[TradeTogether] Archive Vortex creee:" -ForegroundColor Green
+Write-Host "[TradeTogether] Archive creee:" -ForegroundColor Green
 Write-Host "  $archivePath"
