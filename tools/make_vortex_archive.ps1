@@ -1,6 +1,6 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.11.0-strpm"
+    [string]$Version = "0.11.1-strpm"
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,7 +25,7 @@ $mcmNativeScript = Join-Path $dataDir "Scripts\TradeTogetherNative.pex"
 $mcmMenuScript = Join-Path $dataDir "Scripts\TradeTogetherMCM.pex"
 $distDir = Join-Path $ProjectRoot "dist"
 
-# Keep the internal build marker (for example 0.11.0-strpm) for DLL
+# Keep the internal build marker (for example 0.11.1-strpm) for DLL
 # verification, but expose a clean public archive name.
 $publicVersion = $Version -replace '-strpm$', ''
 $archivePath = Join-Path $distDir ("TradeTogether-{0}.zip" -f $publicVersion)
@@ -48,9 +48,6 @@ if (-not (Test-Path -LiteralPath $mcmNativeScript -PathType Leaf) -or
     Write-Warning "Compiled MCM Papyrus scripts are missing. Run build_mcm.bat before a public MCM release."
 }
 
-# The same working tree is also used by the historical UDP branches. Git does
-# not remove untracked package directories when switching branches, so old
-# FOMOD folders must never enter a current STRPM archive.
 $legacyEntries = @("00 Core", "10 LAN", "20 Remote Host", "30 Remote Client", "fomod")
 $foundLegacyEntries = @()
 foreach ($entry in $legacyEntries) {
