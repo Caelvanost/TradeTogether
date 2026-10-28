@@ -1,4 +1,4 @@
-# TradeTogether v0.11.0-strpm
+# TradeTogether v0.11.1-strpm
 
 STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
@@ -25,6 +25,21 @@ TradeTogether itself opens no UDP socket and requires no TradeTogether-specific 
 8. After both confirmations, TradeTogether performs the automatic native transfer.
 
 Quest items are rejected. Item-only, gold-only, mixed item/gold trades and one-way gifts are supported.
+
+## v0.11.1 — STR 1.8.4 transfer hotfix
+
+STR 1.8.4 no longer reliably propagates inventory mutations made by moving items into the local remote-player proxy. v0.11.1 therefore stops using the STR proxy as the transfer destination.
+
+After both players confirm, each client now applies its own committed half of the exchange locally:
+
+- outgoing items/gold are removed from the local player;
+- incoming items/gold are added directly to the local player;
+- all incoming FormIDs are validated before any inventory mutation;
+- STRPM remains responsible for synchronized offers and double confirmation.
+
+This restores normal item and gold delivery without depending on proxy inventory side effects.
+
+Important: the current wire offer only carries FormID, display name and quantity. The local-receipt path therefore recreates incoming items from their base FormID; per-instance ExtraData such as tempering, custom enchantments, charge or custom names is not yet serialized by this hotfix. Do not rely on v0.11.1 to preserve those per-instance modifications until explicit instance-state transport is added.
 
 ## v0.11.0 — configurable controls and SkyUI MCM
 
@@ -137,9 +152,11 @@ TradeTogether hotkeys are suspended while `MessageBoxMenu` is open so an input i
 
 The complete v0.10.0 trade flow was validated with Skyrim Souls RE and unpaused MessageBoxes.
 
-## Native instance-aware transfer
+## Transfer model
 
-TradeTogether uses Skyrim's native inventory transfer path and supplies the selected stack's `ExtraDataList` when available. This is intended to preserve tempering, enchantments, charge, custom names and other per-instance data. Gold uses Skyrim's native Gold form.
+TradeTogether v0.11.1 uses local authoritative inventory mutation on both clients. This avoids the STR 1.8.4 regression where moving an item into the remote player proxy removes it from the giver but does not deliver it to the actual remote player.
+
+Outgoing local stacks are still selected precisely for removal, but incoming items are currently recreated from their base FormID. Per-instance ExtraData preservation is therefore temporarily unsupported by the v0.11.1 hotfix.
 
 ## STR Plugin Messaging transport
 
@@ -159,14 +176,14 @@ Log:
 Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
 ```
 
-Expected v0.11.0 startup entries include:
+Expected v0.11.1 startup entries include:
 
 ```text
-TradeTogether v0.11.0-strpm loading
+TradeTogether v0.11.1-strpm loading
 TradeTogether Papyrus MCM bridge registered
 TradeTogether controls loaded: trade=... add=... remove=... goldAdd=... goldRemove=... cancel=...
 TradeTogether STRPM deferred receive dispatcher started
-TradeTogether v0.11.0-strpm ready ... network=ready
+TradeTogether v0.11.1-strpm ready ... network=ready
 ```
 
 Changing a key through the MCM should log:
@@ -178,7 +195,7 @@ TradeTogether controls loaded: ...
 
 ## Current status
 
-`v0.11.0-strpm` includes the configurable-control system, native Papyrus bridge and SkyUI MCM. The C++ plugin and both Papyrus scripts compile successfully, the lightweight `TradeTogetherMCM.esp` is packaged, and the v0.11.0 archive is generated successfully.
+`v0.11.1-strpm` is the STR 1.8.4 transfer hotfix. It keeps the v0.11.0 configurable controls/MCM and replaces proxy-targeted inventory transfer with local authoritative debit/receipt on each client.
 
 The existing v0.10.0 STR trade flow and Skyrim Souls RE compatibility remain the validated gameplay baseline carried forward by this release.
 
@@ -200,5 +217,5 @@ set "SKYUI_SOURCE=C:\path\to\SkyUI\scripts\source"
 Expected archive name:
 
 ```text
-dist/TradeTogether-0.11.0.zip
+dist/TradeTogether-0.11.1.zip
 ```
