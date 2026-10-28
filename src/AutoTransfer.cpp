@@ -223,13 +223,16 @@ namespace TradeTogether::AutoTransfer
     bool ExecuteLocalExchange(
         RE::PlayerCharacter* a_player,
         const Offer& a_localOffer,
-        const Offer&,
+        const Offer& a_remoteOffer,
         std::uint32_t a_localGold,
-        std::uint32_t,
+        std::uint32_t a_remoteGold,
         std::string& a_error)
     {
-        // Validate every local line and the offered gold before touching the
-        // inventory. No extra UI is shown: this remains an invisible preflight.
+        // Validate everything that can fail before mutating either side of the
+        // local inventory. Since STR 1.8.4, moving an item into the local remote
+        // player proxy no longer reliably materializes that item in the actual
+        // remote player's inventory. Each client therefore applies its own half
+        // of the committed exchange locally.
         if (!ValidateLocalOffer(
                 a_player,
                 a_localOffer,
@@ -238,19 +241,34 @@ namespace TradeTogether::AutoTransfer
             return false;
         }
 
-        if (a_localOffer.empty() && a_localGold == 0) {
-            return true;
-        }
-
-        auto* peerActor = ResolveMostRecentPeerActor(a_player);
-        if (!peerActor) {
-            a_error = "proxy du partenaire introuvable";
+        if (!a_player) {
+            a_error = "joueur local indisponible";
             return false;
         }
 
-        // Move the exact local inventory stacks to STR's remote actor proxy.
-        // Passing the original ExtraDataList makes Skyrim move the actual item
-        // instance instead of recreating it from the base FormID.
+        for (const auto& line : a_remoteOffer) {
+            if (line.formID == 0 || line.quantity == 0 || line.name.empty()) {
+                a_error = "offre distante invalide";
+                return false;
+            }
+            if (!LookupObject(line.formID)) {
+                a_error = fmt::format(
+                    "objet distant introuvable localement: {} ({:08X})",
+                    line.name,
+                    line.formID);
+                return false;
+            }
+        }
+
+        auto* gold = LookupObject(kGoldFormID);
+        if ((a_localGold > 0 || a_remoteGold > 0) && !gold) {
+            a_error = "or introuvable pendant le transfert";
+            return false;
+        }
+
+        // Remove what this client gives. Do not move it to the STR proxy:
+        // proxy inventory mutation is not an authoritative remote-player
+        // transfer path on current STR builds.
         for (const auto& line : a_localOffer) {
             auto plan = BuildTransferPlan(a_player, line);
             auto remaining = static_cast<std::int32_t>(line.quantity);
@@ -264,17 +282,16 @@ namespace TradeTogether::AutoTransfer
                 a_player->RemoveItem(
                     plan.object,
                     count,
-                    RE::ITEM_REMOVE_REASON::kStoreInTeammate,
+                    RE::ITEM_REMOVE_REASON::kRemove,
                     stack.extraList,
-                    peerActor);
+                    nullptr);
                 remaining -= count;
 
                 spdlog::info(
-                    "Native instance transfer: form={:08X} name=\"{}\" count={} extra=1 peer={:08X}",
+                    "Local trade debit: form={:08X} name=\"{}\" count={} extra=1",
                     line.formID,
                     line.name,
-                    count,
-                    peerActor->GetFormID());
+                    count);
             }
 
             if (remaining > 0 && plan.baseCount > 0) {
@@ -282,17 +299,16 @@ namespace TradeTogether::AutoTransfer
                 a_player->RemoveItem(
                     plan.object,
                     count,
-                    RE::ITEM_REMOVE_REASON::kStoreInTeammate,
+                    RE::ITEM_REMOVE_REASON::kRemove,
                     nullptr,
-                    peerActor);
+                    nullptr);
                 remaining -= count;
 
                 spdlog::info(
-                    "Native instance transfer: form={:08X} name=\"{}\" count={} extra=0 peer={:08X}",
+                    "Local trade debit: form={:08X} name=\"{}\" count={} extra=0",
                     line.formID,
                     line.name,
-                    count,
-                    peerActor->GetFormID());
+                    count);
             }
 
             if (remaining > 0) {
@@ -305,24 +321,42 @@ namespace TradeTogether::AutoTransfer
         }
 
         if (a_localGold > 0) {
-            auto* gold = LookupObject(kGoldFormID);
-            if (!gold) {
-                a_error = "or introuvable pendant le transfert";
-                return false;
-            }
-
             a_player->RemoveItem(
                 gold,
                 static_cast<std::int32_t>(a_localGold),
-                RE::ITEM_REMOVE_REASON::kStoreInTeammate,
+                RE::ITEM_REMOVE_REASON::kRemove,
                 nullptr,
-                peerActor);
+                nullptr);
+            spdlog::info("Local trade gold debit: amount={}", a_localGold);
+        }
+
+        // Materialize the remote committed offer directly in this local
+        // player's authoritative inventory. STRPM already synchronized and
+        // double-confirmed the remote offer before this point.
+        for (const auto& line : a_remoteOffer) {
+            auto* object = LookupObject(line.formID);
+            a_player->AddObjectToContainer(
+                object,
+                nullptr,
+                static_cast<std::int32_t>(line.quantity),
+                nullptr);
             spdlog::info(
-                "Native gold transfer: amount={} peer={:08X}",
-                a_localGold,
-                peerActor->GetFormID());
+                "Local trade receipt: form={:08X} name=\"{}\" count={}",
+                line.formID,
+                line.name,
+                line.quantity);
+        }
+
+        if (a_remoteGold > 0) {
+            a_player->AddObjectToContainer(
+                gold,
+                nullptr,
+                static_cast<std::int32_t>(a_remoteGold),
+                nullptr);
+            spdlog::info("Local trade gold receipt: amount={}", a_remoteGold);
         }
 
         return true;
     }
+
 }
