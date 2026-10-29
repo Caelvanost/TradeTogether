@@ -165,7 +165,8 @@ namespace TradeTogether::InstanceData
                     effect->baseEffect->GetFormID(),
                     effect->effectItem.magnitude,
                     effect->effectItem.area,
-                    effect->effectItem.duration
+                    effect->effectItem.duration,
+                    effect->cost
                 });
             }
             return true;
@@ -225,6 +226,7 @@ namespace TradeTogether::InstanceData
                 effect.effectItem.magnitude = encoded.magnitude;
                 effect.effectItem.area = encoded.area;
                 effect.effectItem.duration = encoded.duration;
+                effect.cost = encoded.cost;
             }
 
             auto* enchantment =
@@ -380,11 +382,12 @@ namespace TradeTogether::InstanceData
                         encodedEffects.push_back(',');
                     }
                     encodedEffects += fmt::format(
-                        "{:08X}.{}.{}.{}",
+                        "{:08X}.{}.{}.{}.{}",
                         effect.effectFormID,
                         FloatHex(effect.magnitude),
                         effect.area,
-                        effect.duration);
+                        effect.duration,
+                        FloatHex(effect.cost));
                 }
                 fields.push_back("e=" + encodedEffects);
             }
@@ -487,12 +490,13 @@ namespace TradeTogether::InstanceData
                 }
                 for (const auto encodedEffect : encodedEffects) {
                     const auto parts = Split(encodedEffect, '.');
-                    if (parts.size() != 4) return std::nullopt;
+                    if (parts.size() != 5) return std::nullopt;
                     auto formID = ParseUnsigned<RE::FormID>(parts[0], 16);
                     auto magnitude = ParseFloatHex(parts[1]);
                     auto area = ParseUnsigned<std::uint32_t>(parts[2]);
                     auto duration = ParseUnsigned<std::uint32_t>(parts[3]);
-                    if (!formID || !magnitude || !area || !duration) {
+                    auto cost = ParseFloatHex(parts[4]);
+                    if (!formID || !magnitude || !area || !duration || !cost) {
                         return std::nullopt;
                     }
                     result.enchantmentEffects.push_back(
@@ -500,7 +504,8 @@ namespace TradeTogether::InstanceData
                             *formID,
                             *magnitude,
                             *area,
-                            *duration
+                            *duration,
+                            *cost
                         });
                 }
             } else if (key == "p") {
