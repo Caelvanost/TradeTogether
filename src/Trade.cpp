@@ -10,7 +10,7 @@ namespace TradeTogether::Trade
 {
     namespace
     {
-        constexpr std::string_view kGameplayPrefix = "TTNET|v1|";
+        constexpr std::string_view kGameplayPrefix = "TTNET|v2|";
 
         constexpr std::uint32_t kF6ScanCode = 0x40;
         constexpr std::uint32_t kEScanCode = 0x12;
@@ -562,7 +562,7 @@ namespace TradeTogether::Trade
                 return;
             }
             if (object->GetFormID() == kGoldFormID) {
-                Notify("TradeTogether: utilise PavNum + / - pour offrir des septims.");
+                Notify("TradeTogether: utilise la touche d'or configuree.");
                 return;
             }
             if (entry->IsQuestObject()) {
@@ -570,60 +570,182 @@ namespace TradeTogether::Trade
                 return;
             }
 
+            struct SelectedStack
+            {
+                std::string instanceData;
+                std::uint32_t available{ 0 };
+            };
+
+            std::vector<SelectedStack> selectedStacks;
+            std::int32_t represented = 0;
+
+            if (entry->extraLists) {
+                for (auto* extraList : *entry->extraLists) {
+                    if (!extraList) {
+                        continue;
+                    }
+
+                    const auto stackCount =
+                        std::max(extraList->GetCount(), 1);
+                    const auto* instanceName =
+                        extraList->GetDisplayName(object);
+                    if (!instanceName ||
+                        std::string_view(instanceName) != displayName) {
+                        continue;
+                    }
+
+                    InstanceData::Snapshot snapshot{};
+                    std::string snapshotError;
+                    if (!InstanceData::Capture(
+                            object,
+                            extraList,
+                            snapshot,
+                            snapshotError)) {
+                        Notify(fmt::format(
+                            "TradeTogether: {} ne peut pas etre echange a l'identique ({}).",
+                            displayName,
+                            snapshotError));
+                        spdlog::warn(
+                            "Exact instance capture rejected: form={:08X} name=\"{}\" reason=\"{}\"",
+                            object->GetFormID(),
+                            displayName,
+                            snapshotError);
+                        return;
+                    }
+
+                    represented += stackCount;
+                    const auto payload =
+                        InstanceData::Encode(snapshot);
+                    auto existing = std::find_if(
+                        selectedStacks.begin(),
+                        selectedStacks.end(),
+                        [&](const SelectedStack& a_stack) {
+                            return a_stack.instanceData == payload;
+                        });
+                    if (existing == selectedStacks.end()) {
+                        selectedStacks.push_back(
+                            SelectedStack{
+                                payload,
+                                static_cast<std::uint32_t>(stackCount)
+                            });
+                    } else {
+                        existing->available +=
+                            static_cast<std::uint32_t>(stackCount);
+                    }
+                }
+            }
+
+            const auto baseCount =
+                std::max(
+                    static_cast<std::int32_t>(available) - represented,
+                    0);
+            if (baseCount > 0) {
+                auto base = std::find_if(
+                    selectedStacks.begin(),
+                    selectedStacks.end(),
+                    [](const SelectedStack& a_stack) {
+                        return a_stack.instanceData == "-";
+                    });
+                if (base == selectedStacks.end()) {
+                    selectedStacks.push_back(
+                        SelectedStack{
+                            "-",
+                            static_cast<std::uint32_t>(baseCount)
+                        });
+                } else {
+                    base->available +=
+                        static_cast<std::uint32_t>(baseCount);
+                }
+            }
+
+            if (selectedStacks.empty()) {
+                // A menu row with no explicit ExtraData is a plain base stack.
+                selectedStacks.push_back(
+                    SelectedStack{ "-", available });
+            }
+
             auto& offer = state.session->localOffer;
-            auto iterator = std::find_if(
-                offer.begin(),
-                offer.end(),
-                [formID = object->GetFormID(), displayName](const OfferLine& a_line) {
-                    return a_line.formID == formID && a_line.name == displayName;
-                });
 
             if (a_add) {
-                if (iterator == offer.end()) {
-                    if (offer.size() >= 24) {
-                        Notify("TradeTogether: l'offre est limitee a 24 lignes.");
-                        return;
+                OfferLine* chosenLine = nullptr;
+                const SelectedStack* chosenStack = nullptr;
+
+                for (const auto& stack : selectedStacks) {
+                    auto iterator = std::find_if(
+                        offer.begin(),
+                        offer.end(),
+                        [&](const OfferLine& a_line) {
+                            return a_line.formID == object->GetFormID() &&
+                                   a_line.name == displayName &&
+                                   a_line.instanceData == stack.instanceData;
+                        });
+
+                    const auto alreadyOffered =
+                        iterator != offer.end() ?
+                            iterator->quantity : 0;
+                    if (alreadyOffered < stack.available) {
+                        chosenStack = std::addressof(stack);
+                        if (iterator == offer.end()) {
+                            if (offer.size() >= 24) {
+                                Notify("TradeTogether: l'offre est limitee a 24 lignes.");
+                                return;
+                            }
+                            offer.push_back(OfferLine{
+                                object->GetFormID(),
+                                displayName,
+                                0,
+                                stack.available,
+                                stack.instanceData
+                            });
+                            chosenLine = std::addressof(offer.back());
+                        } else {
+                            chosenLine = std::addressof(*iterator);
+                            chosenLine->available = stack.available;
+                        }
+                        break;
                     }
-                    offer.push_back(OfferLine{
-                        object->GetFormID(),
-                        displayName,
-                        1,
-                        available
-                    });
-                    iterator = std::prev(offer.end());
-                } else {
-                    iterator->available = available;
-                    if (iterator->quantity >= available) {
-                        Notify("TradeTogether: toute la pile est deja dans l'offre.");
-                        return;
-                    }
-                    ++iterator->quantity;
                 }
+
+                if (!chosenLine || !chosenStack) {
+                    Notify("TradeTogether: toute cette pile est deja dans l'offre.");
+                    return;
+                }
+
+                ++chosenLine->quantity;
+                ResetLocalApproval();
+                SendLocalState(false);
+                Notify(fmt::format(
+                    "Offre: {} x {}",
+                    chosenLine->quantity,
+                    chosenLine->name));
             } else {
-                if (iterator == offer.end()) {
+                auto iterator = std::find_if(
+                    offer.rbegin(),
+                    offer.rend(),
+                    [&](const OfferLine& a_line) {
+                        return a_line.formID == object->GetFormID() &&
+                               a_line.name == displayName;
+                    });
+                if (iterator == offer.rend()) {
                     Notify("TradeTogether: cet objet n'est pas dans l'offre.");
                     return;
                 }
+
                 if (iterator->quantity > 1) {
                     --iterator->quantity;
                 } else {
-                    offer.erase(iterator);
-                    iterator = offer.end();
+                    offer.erase(std::next(iterator).base());
                 }
+
+                ResetLocalApproval();
+                SendLocalState(false);
+                Notify(fmt::format(
+                    "Offre mise a jour: {}",
+                    displayName));
             }
 
-            ResetLocalApproval();
-            SendLocalState(false);
-            if (a_add && iterator != offer.end()) {
-                Notify(fmt::format(
-                    "Offre: {} x {}",
-                    iterator->quantity,
-                    iterator->name));
-            } else {
-                Notify(fmt::format("Offre mise a jour: {}", displayName));
-            }
             spdlog::info(
-                "Local offer edited: action={} form={:08X} name=\"{}\" available={} lines={}",
+                "Local offer edited: action={} form={:08X} name=\"{}\" available={} lines={} exactInstances=1",
                 a_add ? "add" : "remove",
                 object->GetFormID(),
                 displayName,
