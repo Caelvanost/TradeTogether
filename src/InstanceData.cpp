@@ -200,7 +200,14 @@ namespace TradeTogether::InstanceData
                 return nullptr;
             }
 
-            auto* manager = RE::BGSCreatedObjectManager::GetSingleton();
+            // CommonLibSSE-NG 3.5.2 does not expose
+            // RE::BGSCreatedObjectManager in its public headers. Use the same
+            // Address Library relocations used by newer CommonLib versions
+            // while keeping the project on the validated 3.5.2 dependency.
+            static REL::Relocation<void**> managerSingleton{
+                RELOCATION_ID(514172, 400320)
+            };
+            auto* manager = *managerSingleton;
             if (!manager) {
                 a_error = "BGSCreatedObjectManager indisponible";
                 return nullptr;
@@ -229,10 +236,20 @@ namespace TradeTogether::InstanceData
                 effect.cost = encoded.cost;
             }
 
+            using AddEnchantmentFn =
+                RE::EnchantmentItem* (*)(void*, RE::BSTArray<RE::Effect>&);
+
+            static REL::Relocation<AddEnchantmentFn> addWeaponEnchantment{
+                RELOCATION_ID(35263, 36165)
+            };
+            static REL::Relocation<AddEnchantmentFn> addArmorEnchantment{
+                RELOCATION_ID(35264, 36166)
+            };
+
             auto* enchantment =
                 a_object->GetFormType() == RE::FormType::Weapon ?
-                    manager->AddWeaponEnchantment(effects) :
-                    manager->AddArmorEnchantment(effects);
+                    addWeaponEnchantment(manager, effects) :
+                    addArmorEnchantment(manager, effects);
             if (!enchantment) {
                 a_error = "creation de l'enchantement dynamique impossible";
             }
