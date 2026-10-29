@@ -414,7 +414,7 @@ namespace TradeTogether
 
         RefreshIdentity();
         const auto packet = fmt::format(
-            "TTNET|v1|id={}|from={}|{}",
+            "TTNET|v2|id={}|from={}|{}",
             _localConnectionID,
             Protocol::HexEncode(GetLocalPlayerName()),
             a_payload);
