@@ -16,6 +16,7 @@ set(PROJECT_SOURCES
     src/AutoTransfer.cpp
     src/Config.h
     src/Config.cpp
+    src/CommonLibCompat.cpp
     src/Input.h
     src/Input.cpp
     src/InstanceData.h
