@@ -8,6 +8,7 @@ namespace TradeTogether::InstanceData
         float magnitude{ 0.0F };
         std::uint32_t area{ 0 };
         std::uint32_t duration{ 0 };
+        float cost{ 0.0F };
     };
 
     struct Snapshot
