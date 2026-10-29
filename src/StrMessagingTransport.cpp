@@ -9,7 +9,7 @@ namespace TradeTogether
     namespace
     {
         constexpr char kChannel[] = "tradetogether.offer.v1";
-        constexpr std::string_view kGameplayPrefix = "TTNET|v1|";
+        constexpr std::string_view kGameplayPrefix = "TTNET|v2|";
 
         std::string ReadLocalPlayerName()
         {
