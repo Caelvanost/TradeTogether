@@ -2,6 +2,7 @@
 #include "Trade.h"
 #include "AutoTransfer.h"
 #include "Config.h"
+#include "InstanceData.h"
 #include "Offer.h"
 #include "Protocol.h"
 #include "UdpTransport.h"
