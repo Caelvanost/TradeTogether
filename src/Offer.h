@@ -8,6 +8,11 @@ namespace TradeTogether
         std::string name;
         std::uint32_t quantity{ 0 };
         std::uint32_t available{ 0 };
+
+        // InstanceData::Encode payload. "-" means a plain base-form stack.
+        // Altered stacks with different payloads remain distinct offer lines
+        // even when their base FormID and display name are identical.
+        std::string instanceData{ "-" };
     };
 
     using Offer = std::vector<OfferLine>;
