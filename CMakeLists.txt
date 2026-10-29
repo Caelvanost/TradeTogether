@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(TradeTogether VERSION 0.11.1 LANGUAGES CXX)
+project(TradeTogether VERSION 0.12.0 LANGUAGES CXX)
 set(TRADETOGETHER_RELEASE_VERSION "${PROJECT_VERSION}-strpm")
 
 set(CMAKE_CXX_STANDARD 23)
@@ -18,6 +18,8 @@ set(PROJECT_SOURCES
     src/Config.cpp
     src/Input.h
     src/Input.cpp
+    src/InstanceData.h
+    src/InstanceData.cpp
     src/Localization.h
     src/Localization.cpp
     src/MCMBridge.h
