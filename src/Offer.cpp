@@ -1,6 +1,7 @@
 #include "PCH.h"
 #include "Offer.h"
 #include "Protocol.h"
+#include "InstanceData.h"
 
 namespace TradeTogether
 {
@@ -8,6 +9,7 @@ namespace TradeTogether
     {
         constexpr std::size_t kMaximumOfferLines = 24;
         constexpr std::size_t kMaximumItemNameBytes = 120;
+        constexpr std::size_t kMaximumInstancePayloadBytes = 4096;
         constexpr std::uint32_t kMaximumQuantity = 9999;
     }
 
@@ -17,20 +19,23 @@ namespace TradeTogether
         const auto count = std::min(a_offer.size(), kMaximumOfferLines);
         for (std::size_t index = 0; index < count; ++index) {
             const auto& line = a_offer[index];
-            if (line.formID == 0 || line.name.empty() || line.quantity == 0) {
+            if (line.formID == 0 || line.name.empty() || line.quantity == 0 ||
+                line.instanceData.empty() ||
+                line.instanceData.size() > kMaximumInstancePayloadBytes) {
                 continue;
             }
             if (!encoded.empty()) {
                 encoded.push_back(';');
             }
             encoded += fmt::format(
-                "{:08X}:{}:{}",
+                "{:08X}:{}:{}:{}",
                 line.formID,
                 std::min(line.quantity, kMaximumQuantity),
                 Protocol::HexEncode(
                     std::string_view(line.name).substr(
                         0,
-                        kMaximumItemNameBytes)));
+                        kMaximumItemNameBytes)),
+                Protocol::HexEncode(line.instanceData));
         }
         return encoded.empty() ? "-" : encoded;
     }
@@ -64,6 +69,10 @@ namespace TradeTogether
             if (secondSeparator == std::string_view::npos) {
                 return std::nullopt;
             }
+            const auto thirdSeparator = token.find(':', secondSeparator + 1);
+            if (thirdSeparator == std::string_view::npos) {
+                return std::nullopt;
+            }
 
             RE::FormID formID = 0;
             std::uint32_t quantity = 0;
@@ -89,11 +98,28 @@ namespace TradeTogether
                 return std::nullopt;
             }
 
-            auto name = Protocol::HexDecode(token.substr(secondSeparator + 1));
-            if (!name || name->empty() || name->size() > kMaximumItemNameBytes) {
+            auto name = Protocol::HexDecode(
+                token.substr(
+                    secondSeparator + 1,
+                    thirdSeparator - secondSeparator - 1));
+            auto instanceData =
+                Protocol::HexDecode(token.substr(thirdSeparator + 1));
+
+            if (!name || name->empty() ||
+                name->size() > kMaximumItemNameBytes ||
+                !instanceData || instanceData->empty() ||
+                instanceData->size() > kMaximumInstancePayloadBytes ||
+                !InstanceData::Decode(*instanceData)) {
                 return std::nullopt;
             }
-            result.push_back(OfferLine{ formID, std::move(*name), quantity, 0 });
+
+            result.push_back(OfferLine{
+                formID,
+                std::move(*name),
+                quantity,
+                0,
+                std::move(*instanceData)
+            });
 
             if (end == a_value.size()) {
                 break;
