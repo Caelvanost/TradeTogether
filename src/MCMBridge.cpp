@@ -108,6 +108,13 @@ namespace TradeTogether::MCMBridge
             return false;
         }
 
+        static std::atomic_bool registered{ false };
+        bool expected = false;
+        if (!registered.compare_exchange_strong(expected, true)) {
+            spdlog::warn("TradeTogether Papyrus MCM bridge registration ignored: already registered");
+            return true;
+        }
+
         a_vm->RegisterFunction("GetKey", kScriptName.data(), GetKey);
         a_vm->RegisterFunction("GetDefaultKey", kScriptName.data(), GetDefaultKey);
         a_vm->RegisterFunction("SetKey", kScriptName.data(), SetKey);
