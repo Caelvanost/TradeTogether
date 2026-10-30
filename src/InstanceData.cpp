@@ -80,6 +80,37 @@ namespace TradeTogether::InstanceData
             func(a_extraList, a_health);
         }
 
+        void SetChargeCompat(
+            RE::ExtraDataList* a_extraList,
+            float a_charge)
+        {
+            using func_t = void (*)(RE::ExtraDataList*, float);
+            static REL::Relocation<func_t> func{ REL::ID(11619) };
+            func(a_extraList, a_charge);
+        }
+
+        void SetSoulCompat(
+            RE::ExtraDataList* a_extraList,
+            RE::SOUL_LEVEL a_soulLevel)
+        {
+            using func_t = void (*)(RE::ExtraDataList*, RE::SOUL_LEVEL);
+            static REL::Relocation<func_t> func{ REL::ID(11620) };
+            func(a_extraList, a_soulLevel);
+        }
+
+        void SetPoisonCompat(
+            RE::ExtraDataList* a_extraList,
+            RE::AlchemyItem* a_poison,
+            std::uint32_t a_count)
+        {
+            using func_t = void (*)(
+                RE::ExtraDataList*,
+                RE::AlchemyItem*,
+                std::uint32_t);
+            static REL::Relocation<func_t> func{ REL::ID(11822) };
+            func(a_extraList, a_poison, a_count);
+        }
+
         void SetEnchantmentCompat(
             RE::ExtraDataList* a_extraList,
             RE::EnchantmentItem* a_enchantment,
@@ -650,9 +681,7 @@ namespace TradeTogether::InstanceData
         }
 
         if (a_snapshot.charge) {
-            auto* charge = new RE::ExtraCharge();
-            charge->charge = *a_snapshot.charge;
-            extraList->Add(charge);
+            SetChargeCompat(extraList, *a_snapshot.charge);
         }
 
         if (a_snapshot.customName) {
@@ -694,16 +723,16 @@ namespace TradeTogether::InstanceData
                 delete extraList;
                 return nullptr;
             }
-            extraList->Add(
-                new RE::ExtraPoison(
-                    poison,
-                    static_cast<std::int32_t>(a_snapshot.poisonCount)));
+            SetPoisonCompat(
+                extraList,
+                poison,
+                a_snapshot.poisonCount);
         }
 
         if (a_snapshot.soulLevel) {
-            extraList->Add(
-                new RE::ExtraSoul(
-                    static_cast<RE::SOUL_LEVEL>(*a_snapshot.soulLevel)));
+            SetSoulCompat(
+                extraList,
+                static_cast<RE::SOUL_LEVEL>(*a_snapshot.soulLevel));
         }
 
         return extraList;
