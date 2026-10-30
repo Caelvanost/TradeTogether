@@ -71,6 +71,15 @@ namespace TradeTogether::InstanceData
             return result;
         }
 
+        void SetHealthCompat(
+            RE::ExtraDataList* a_extraList,
+            float a_health)
+        {
+            using func_t = void (*)(RE::ExtraDataList*, float);
+            static REL::Relocation<func_t> func{ REL::ID(11616) };
+            func(a_extraList, a_health);
+        }
+
         void SetEnchantmentCompat(
             RE::ExtraDataList* a_extraList,
             RE::EnchantmentItem* a_enchantment,
@@ -615,7 +624,7 @@ namespace TradeTogether::InstanceData
         auto* extraList = new RE::ExtraDataList();
 
         if (a_snapshot.health) {
-            extraList->Add(new RE::ExtraHealth(*a_snapshot.health));
+            SetHealthCompat(extraList, *a_snapshot.health);
         }
 
         RE::EnchantmentItem* enchantment = nullptr;
