@@ -1,6 +1,6 @@
 param(
     [string]$ProjectRoot,
-    [string]$Version = "0.12.3-strpm"
+    [string]$Version = "0.12.4-strpm"
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,7 +25,7 @@ $mcmNativeScript = Join-Path $dataDir "Scripts\TradeTogetherNative.pex"
 $mcmMenuScript = Join-Path $dataDir "Scripts\TradeTogetherMCM.pex"
 $distDir = Join-Path $ProjectRoot "dist"
 
-# Keep the internal build marker (for example 0.12.3-strpm) for DLL
+# Keep the internal build marker (for example 0.12.4-strpm) for DLL
 # verification, but expose a clean public archive name.
 $publicVersion = $Version -replace '-strpm$', ''
 $archivePath = Join-Path $distDir ("TradeTogether-{0}.zip" -f $publicVersion)
