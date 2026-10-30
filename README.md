@@ -1,4 +1,4 @@
-# TradeTogether v0.12.3-strpm
+# TradeTogether v0.12.4-strpm
 
 STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
@@ -26,9 +26,9 @@ TradeTogether itself opens no UDP socket and requires no TradeTogether-specific 
 
 Quest items are rejected. Item-only, gold-only, mixed item/gold trades and one-way gifts are supported.
 
-## v0.12.3 — exact altered-item transfer
+## v0.12.4 — exact altered-item transfer
 
-v0.12.3 extends the STRPM trade protocol from `TTNET|v1|` to `TTNET|v2|` and carries an explicit per-stack instance descriptor with every offered item.
+v0.12.4 extends the STRPM trade protocol from `TTNET|v1|` to `TTNET|v2|` and carries an explicit per-stack instance descriptor with every offered item.
 
 The receiver rebuilds the incoming `ExtraDataList` before the giver's local inventory is debited. The current implementation preserves:
 
@@ -176,7 +176,7 @@ The complete v0.10.0 trade flow was validated with Skyrim Souls RE and unpaused 
 
 ## Transfer model
 
-TradeTogether v0.12.3 keeps the local-authoritative debit/receipt model introduced by v0.11.1, but incoming altered stacks are now recreated with an explicit `ExtraDataList` instead of being reduced to their base FormID.
+TradeTogether v0.12.4 keeps the local-authoritative debit/receipt model introduced by v0.11.1, but incoming altered stacks are now recreated with an explicit `ExtraDataList` instead of being reduced to their base FormID.
 
 Player-created enchantments are recreated locally through Skyrim's created-object manager from their serialized effects; raw dynamic FormIDs are never copied between clients.
 
@@ -198,14 +198,14 @@ Log:
 Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
 ```
 
-Expected v0.12.3 startup entries include:
+Expected v0.12.4 startup entries include:
 
 ```text
-TradeTogether v0.12.3-strpm loading
+TradeTogether v0.12.4-strpm loading
 TradeTogether Papyrus MCM bridge registered
 TradeTogether controls loaded: trade=... add=... remove=... goldAdd=... goldRemove=... cancel=...
 TradeTogether STRPM deferred receive dispatcher started
-TradeTogether v0.12.3-strpm ready ... network=ready
+TradeTogether v0.12.4-strpm ready ... network=ready
 ```
 
 Changing a key through the MCM should log:
@@ -217,7 +217,7 @@ TradeTogether controls loaded: ...
 
 ## Current status
 
-`v0.12.3-strpm` is under development on the `instance-transfer` branch. It builds on the runtime-validated v0.11.1 local transfer model and adds exact per-stack instance serialization/reconstruction. It must compile and pass the altered-item two-client regression matrix before merging to `main` or publishing.
+`v0.12.4-strpm` is under development on the `instance-transfer` branch. It builds on the runtime-validated v0.11.1 local transfer model and adds exact per-stack instance serialization/reconstruction. It must compile and pass the altered-item two-client regression matrix before merging to `main` or publishing.
 
 The existing v0.10.0 STR trade flow and Skyrim Souls RE compatibility remain the validated gameplay baseline carried forward by this release.
 
@@ -239,5 +239,5 @@ set "SKYUI_SOURCE=C:\path\to\SkyUI\scripts\source"
 Expected archive name:
 
 ```text
-dist/TradeTogether-0.12.3.zip
+dist/TradeTogether-0.12.4.zip
 ```
