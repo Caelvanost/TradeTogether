@@ -588,10 +588,14 @@ namespace TradeTogether::InstanceData
                 delete extraList;
                 return nullptr;
             }
-            extraList->Add(new RE::ExtraEnchantment(
+            // Let Skyrim build/register the enchantment ExtraData itself.
+            // This is important for dynamically-created enchantments: directly
+            // constructing ExtraEnchantment bypasses engine-side bookkeeping
+            // and can leave an inventory entry that crashes when enumerated.
+            extraList->SetEnchantment(
                 enchantment,
                 a_snapshot.enchantmentMaxCharge,
-                a_snapshot.removeOnUnequip));
+                a_snapshot.removeOnUnequip);
         }
 
         if (a_snapshot.charge) {
@@ -601,9 +605,8 @@ namespace TradeTogether::InstanceData
         }
 
         if (a_snapshot.customName) {
-            extraList->Add(
-                new RE::ExtraTextDisplayData(
-                    a_snapshot.customName->c_str()));
+            extraList->SetOverrideName(
+                a_snapshot.customName->c_str());
         }
 
         if (a_snapshot.ownershipFormID) {
@@ -616,7 +619,7 @@ namespace TradeTogether::InstanceData
                 delete extraList;
                 return nullptr;
             }
-            extraList->Add(new RE::ExtraOwnership(owner));
+            extraList->SetOwner(owner);
         }
 
         if (a_snapshot.ownershipRank) {
