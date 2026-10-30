@@ -71,6 +71,47 @@ namespace TradeTogether::InstanceData
             return result;
         }
 
+        void SetEnchantmentCompat(
+            RE::ExtraDataList* a_extraList,
+            RE::EnchantmentItem* a_enchantment,
+            std::uint16_t a_chargeAmount,
+            bool a_removeOnUnequip)
+        {
+            using func_t = void (*)(
+                RE::ExtraDataList*,
+                RE::EnchantmentItem*,
+                std::uint16_t,
+                bool);
+            static REL::Relocation<func_t> func{
+                RELOCATION_ID(11921, 12060)
+            };
+            func(
+                a_extraList,
+                a_enchantment,
+                a_chargeAmount,
+                a_removeOnUnequip);
+        }
+
+        void SetOverrideNameCompat(
+            RE::ExtraDataList* a_extraList,
+            const char* a_name)
+        {
+            if (!a_extraList || !a_name || !*a_name) {
+                return;
+            }
+
+            auto* textData =
+                a_extraList->GetByType<RE::ExtraTextDisplayData>();
+            if (!textData) {
+                textData = new RE::ExtraTextDisplayData();
+                a_extraList->Add(textData);
+            }
+
+            if (!textData->displayNameText && !textData->ownerQuest) {
+                textData->SetName(a_name);
+            }
+        }
+
         bool IsIgnorableLocalExtra(RE::ExtraDataType a_type)
         {
             switch (a_type) {
@@ -592,7 +633,8 @@ namespace TradeTogether::InstanceData
             // This is important for dynamically-created enchantments: directly
             // constructing ExtraEnchantment bypasses engine-side bookkeeping
             // and can leave an inventory entry that crashes when enumerated.
-            extraList->SetEnchantment(
+            SetEnchantmentCompat(
+                extraList,
                 enchantment,
                 a_snapshot.enchantmentMaxCharge,
                 a_snapshot.removeOnUnequip);
@@ -605,7 +647,8 @@ namespace TradeTogether::InstanceData
         }
 
         if (a_snapshot.customName) {
-            extraList->SetOverrideName(
+            SetOverrideNameCompat(
+                extraList,
                 a_snapshot.customName->c_str());
         }
 
