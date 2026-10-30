@@ -29,6 +29,13 @@ namespace
         }
 
         if (a_message->type == SKSE::MessagingInterface::kDataLoaded) {
+            static std::atomic_bool initialized{ false };
+            bool expected = false;
+            if (!initialized.compare_exchange_strong(expected, true)) {
+                spdlog::warn("TradeTogether DataLoaded initialization ignored: already initialized");
+                return;
+            }
+
             const bool skyrimSoulsLoaded =
                 GetModuleHandleW(L"SkyrimSoulsRE.dll") != nullptr;
             spdlog::info(
