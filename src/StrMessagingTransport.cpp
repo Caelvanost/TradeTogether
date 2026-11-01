@@ -222,6 +222,12 @@ namespace TradeTogether
         }
     }
 
+    std::optional<STRPM::ConnectionID> StrMessagingTransport::ResolvePlayerConnectionID(
+        std::string_view a_playerName)
+    {
+        return ResolveConnectionIDForPlayerName(a_playerName);
+    }
+
     std::optional<STRPM::ConnectionID> StrMessagingTransport::ResolveConnectionIDForPlayerName(std::string_view a_playerName)
     {
         if (a_playerName.empty()) {
