@@ -410,6 +410,7 @@ namespace TradeTogether::Trade
                     session.remoteOffer,
                     session.localGold,
                     session.remoteGold,
+                    session.peerName,
                     transferError)) {
                 state.session.reset();
                 Notify(fmt::format(
