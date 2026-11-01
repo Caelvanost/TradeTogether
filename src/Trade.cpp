@@ -784,13 +784,13 @@ namespace TradeTogether::Trade
         bool SendResponse(
             const std::string& a_requestID,
             const std::string& a_requester,
-            bool a_acceptedd)
+            bool a_accepted)
         {
             const auto payload = fmt::format(
-                "type=RESPONSE|request={}|to={}|acceptedd={}",
+                "type=RESPONSE|request={}|to={}|accepted={}",
                 a_requestID,
                 Protocol::HexEncode(a_requester),
-                a_acceptedd ? 1 : 0);
+                a_accepted ? 1 : 0);
             return UdpTransport::GetSingleton().SendTo(a_requester, payload);
         }
 
@@ -798,21 +798,21 @@ namespace TradeTogether::Trade
             std::string a_requestID,
             std::string a_requester,
             std::chrono::steady_clock::time_point a_receivedAt,
-            bool a_acceptedd)
+            bool a_accepted)
         {
             auto& state = GetState();
             const auto expired =
                 std::chrono::steady_clock::now() - a_receivedAt >
                 std::chrono::milliseconds(state.config.requestTimeoutMs);
             if (expired || state.session) {
-                a_acceptedd = false;
+                a_accepted = false;
             }
 
-            if (a_acceptedd) {
+            if (a_accepted) {
                 StartSession(a_requestID, a_requester, false);
             }
-            if (!SendResponse(a_requestID, a_requester, a_acceptedd)) {
-                if (a_acceptedd) {
+            if (!SendResponse(a_requestID, a_requester, a_accepted)) {
+                if (a_accepted) {
                     state.session.reset();
                 }
                 Notify("TradeTogether: could not send the response.");
@@ -824,14 +824,14 @@ namespace TradeTogether::Trade
             } else {
                 Notify(fmt::format(
                     "TradeTogether: trade {} for {}.",
-                    a_acceptedd ? "accepted" : "declined",
+                    a_accepted ? "accepted" : "declined",
                     a_requester));
             }
             spdlog::info(
-                "Trade request answered: request={} requester=\"{}\" acceptedd={} expired={}",
+                "Trade request answered: request={} requester=\"{}\" accepted={} expired={}",
                 a_requestID,
                 a_requester,
-                a_acceptedd ? 1 : 0,
+                a_accepted ? 1 : 0,
                 expired ? 1 : 0);
         }
 
@@ -882,8 +882,8 @@ namespace TradeTogether::Trade
             }
 
             const auto prompt = fmt::format(
-                "{} souhaite echanger avec vous.\n"
-                "Accept et composer votre offre ?",
+                "{} wants to trade with you.\n"
+                "Accept and compose your offer?",
                 a_requester);
             RE::CreateMessage(
                 prompt.c_str(),
@@ -905,7 +905,7 @@ namespace TradeTogether::Trade
         void HandleIncomingResponse(
             const std::string& a_requestID,
             const std::string& a_responder,
-            bool a_acceptedd)
+            bool a_accepted)
         {
             auto& state = GetState();
             if (!state.pending ||
@@ -927,9 +927,9 @@ namespace TradeTogether::Trade
                 Notify("TradeTogether: the trade request expired.");
                 return;
             }
-            if (!a_acceptedd) {
+            if (!a_accepted) {
                 Notify(fmt::format(
-                    "TradeTogether: {} a declined l'echange.",
+                    "TradeTogether: {} declined the trade.",
                     a_responder));
                 return;
             }
@@ -954,7 +954,7 @@ namespace TradeTogether::Trade
                 pending.target,
                 pending.targetFormID);
             Notify(fmt::format(
-                "TradeTogether: {} a accepted. Compose ton offre.",
+                "TradeTogether: {} accepted. Compose your offer.",
                 pending.targetName));
         }
 
@@ -1073,7 +1073,7 @@ namespace TradeTogether::Trade
                 state.pending->requestID,
                 state.pending->targetName);
             state.pending.reset();
-            Notify("TradeTogether: aucune reponse, demande expiree.");
+            Notify("TradeTogether: no response, trade request expired.");
         }
 
         if (state.session &&
@@ -1199,12 +1199,12 @@ namespace TradeTogether::Trade
             return;
         }
         if (*type == "RESPONSE") {
-            const auto acceptedd = Protocol::ReadField(a_packet, "acceptedd");
-            if (!acceptedd || (*acceptedd != "0" && *acceptedd != "1")) {
+            const auto accepted = Protocol::ReadField(a_packet, "accepted");
+            if (!accepted || (*accepted != "0" && *accepted != "1")) {
                 spdlog::warn("Malformed trade response ignored");
                 return;
             }
-            HandleIncomingResponse(*requestID, *from, *acceptedd == "1");
+            HandleIncomingResponse(*requestID, *from, *accepted == "1");
             return;
         }
 
@@ -1252,7 +1252,7 @@ namespace TradeTogether::Trade
             Notify(fmt::format(
                 "TradeTogether: {} {}.",
                 state.session->peerName,
-                state.session->remoteReady ? "is ready" : "is editing son offre"));
+                state.session->remoteReady ? "is ready" : "is editing the offer"));
             if (state.session->localReady && state.session->remoteReady) {
                 ShowFinalPrompt();
             }
