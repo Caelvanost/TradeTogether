@@ -494,6 +494,7 @@ namespace TradeTogether::AutoTransfer
         const Offer&,
         std::uint32_t a_localGold,
         std::uint32_t,
+        std::string_view a_peerName,
         std::string& a_error)
     {
         a_error.clear();
@@ -521,16 +522,14 @@ namespace TradeTogether::AutoTransfer
             return false;
         }
 
-        const auto peerName =
-            UdpTransport::GetSingleton().GetMostRecentPeerName();
-        if (!peerName || peerName->empty()) {
+        if (a_peerName.empty()) {
             a_error = "partenaire STR introuvable";
             return false;
         }
 
         const auto peerConnection =
             UdpTransport::GetSingleton().ResolvePlayerConnectionID(
-                *peerName);
+                a_peerName);
         if (!peerConnection || *peerConnection == 0) {
             a_error = "ConnectionID STR du partenaire introuvable";
             return false;
