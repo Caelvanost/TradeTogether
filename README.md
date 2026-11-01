@@ -1,4 +1,4 @@
-# TradeTogether v0.11.0-strpm
+# TradeTogether v0.12.0-strpm-inventory
 
 STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
@@ -7,7 +7,7 @@ STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 - Skyrim Special Edition / Anniversary Edition
 - SKSE
 - Skyrim Together Reborn
-- STR Plugin Messaging API with Proxy Resolver support
+- STR Plugin Messaging API **0.11.0 inventory-service build** with Proxy Resolver and Inventory Bridge support
 - The same TradeTogether build on every player
 - SkyUI for the optional MCM
 
@@ -137,9 +137,21 @@ TradeTogether hotkeys are suspended while `MessageBoxMenu` is open so an input i
 
 The complete v0.10.0 trade flow was validated with Skyrim Souls RE and unpaused MessageBoxes.
 
-## Native instance-aware transfer
+## STRPM Inventory Bridge transfer
 
-TradeTogether uses Skyrim's native inventory transfer path and supplies the selected stack's `ExtraDataList` when available. This is intended to preserve tempering, enchantments, charge, custom names and other per-instance data. Gold uses Skyrim's native Gold form.
+v0.12.0 no longer transfers inventory by calling Skyrim `RemoveItem` on the remote STR proxy and never reconstructs or passes an `ExtraDataList`.
+
+At final confirmation TradeTogether:
+
+1. requests STRPM's canonical local inventory snapshot;
+2. resolves the partner's STR `ConnectionID`;
+3. converts each offered line to the matching portable `InventoryEntry`;
+4. starts an owner-to-owner STRPM inventory transfer;
+5. logs the asynchronous `Prepared / RemovingLocal / Committing / ApplyingRemote / Complete / Failed / RolledBack` states.
+
+Gold is transferred through the same Inventory Bridge path.
+
+The current bridge API does not expose Skyrim display names for individual canonical variants. For safety, this first integration rejects a trade line when the same base FormID has several distinct STRPM inventory variants. It will not guess which tempered, enchanted, charged, poisoned or otherwise modified instance the user intended to trade.
 
 ## STR Plugin Messaging transport
 
@@ -178,9 +190,11 @@ TradeTogether controls loaded: ...
 
 ## Current status
 
-`v0.11.0-strpm` includes the configurable-control system, native Papyrus bridge and SkyUI MCM. The C++ plugin and both Papyrus scripts compile successfully, the lightweight `TradeTogetherMCM.esp` is packaged, and the v0.11.0 archive is generated successfully.
+`v0.12.0-strpm-inventory` is the experimental integration branch for STRPM 0.11.0's Inventory Bridge.
 
-The existing v0.10.0 STR trade flow and Skyrim Souls RE compatibility remain the validated gameplay baseline carried forward by this release.
+The old direct `ExtraDataList` / remote-proxy transfer path has been removed from `AutoTransfer`. Inventory validation and transfer now go through STRPM's canonical inventory representation.
+
+This build still needs compilation and two-client runtime validation. In particular, verify simple stacks and gold first, then instance-bearing items. The bridge itself is still considered experimental until those tests pass.
 
 ## Build
 
@@ -200,5 +214,5 @@ set "SKYUI_SOURCE=C:\path\to\SkyUI\scripts\source"
 Expected archive name:
 
 ```text
-dist/TradeTogether-0.11.0.zip
+dist/TradeTogether-0.12.0.zip
 ```
