@@ -425,10 +425,10 @@ namespace TradeTogether::Trade
 
             state.session.reset();
             Notify(fmt::format(
-                "TradeTogether: echange automatique termine avec {}.",
+                "TradeTogether: transferts STRPM lances avec {}.",
                 session.peerName));
             spdlog::info(
-                "Automatic trade transfer completed: request={} peer=\"{}\" givenLines={} receivedLines={} givenGold={} receivedGold={}",
+                "STRPM trade transfers started: request={} peer=\"{}\" givenLines={} receivedLines={} givenGold={} receivedGold={}",
                 session.requestID,
                 session.peerName,
                 session.localOffer.size(),
