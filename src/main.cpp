@@ -45,7 +45,7 @@ namespace
             TradeTogether::InputEventSink::GetSingleton()->Register();
             const auto networkReady = TradeTogether::Trade::Initialize();
             spdlog::info(
-                "TradeTogether v0.13.0-strpm-inventory ready - STR Plugin Messaging, configurable controls, STRPM canonical inventory transfer network={}",
+                "TradeTogether v0.13.1-strpm-inventory ready - STR Plugin Messaging, configurable controls, STRPM canonical inventory transfer network={}",
                 networkReady ? "ready" : "unavailable");
         } else if (
             a_message->type == SKSE::MessagingInterface::kPreLoadGame ||
@@ -60,7 +60,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
     SKSE::Init(a_skse);
     SetupLog();
 
-    spdlog::info("TradeTogether v0.13.0-strpm-inventory loading");
+    spdlog::info("TradeTogether v0.13.1-strpm-inventory loading");
 
     auto* papyrus = SKSE::GetPapyrusInterface();
     if (!papyrus || !papyrus->Register(TradeTogether::MCMBridge::Register)) {
