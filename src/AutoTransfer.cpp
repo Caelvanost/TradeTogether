@@ -79,7 +79,7 @@ namespace TradeTogether::AutoTransfer
             if (a_event->state == STRPM::InventoryTransferState::kFailed ||
                 a_event->state == STRPM::InventoryTransferState::kRolledBack) {
                 NotifyOnGameThread(fmt::format(
-                    "TradeTogether: transfert STRPM echoue ({})",
+                    "TradeTogether: STRPM transfer failed ({})",
                     STRPM::ResultToString(a_event->result)));
             }
         }
@@ -92,7 +92,7 @@ namespace TradeTogether::AutoTransfer
                 inventory->version != STRPM::kInventoryInterfaceVersion ||
                 !inventory->getLocalInventory ||
                 !inventory->transfer) {
-                a_error = "Inventory Bridge STRPM indisponible";
+                a_error = "STRPM Inventory Bridge unavailable";
                 return nullptr;
             }
 
@@ -129,7 +129,7 @@ namespace TradeTogether::AutoTransfer
                     a_inventory->getLocalInventory(nullptr, 0, &count);
                 if (result != STRPM::Result::kOk) {
                     a_error = fmt::format(
-                        "snapshot STRPM impossible ({})",
+                        "STRPM inventory snapshot failed ({})",
                         STRPM::ResultToString(result));
                     return false;
                 }
@@ -150,7 +150,7 @@ namespace TradeTogether::AutoTransfer
                 }
                 if (result != STRPM::Result::kOk) {
                     a_error = fmt::format(
-                        "snapshot STRPM impossible ({})",
+                        "STRPM inventory snapshot failed ({})",
                         STRPM::ResultToString(result));
                     return false;
                 }
@@ -159,7 +159,7 @@ namespace TradeTogether::AutoTransfer
                 return true;
             }
 
-            a_error = "inventaire modifie pendant le snapshot STRPM";
+            a_error = "inventory changed during STRPM snapshot";
             return false;
         }
 
@@ -326,7 +326,7 @@ namespace TradeTogether::AutoTransfer
             const auto snapshot = InstanceData::Decode(a_line.instanceData);
             if (!snapshot) {
                 a_error = fmt::format(
-                    "etat d'instance invalide pour {}",
+                    "invalid instance state for {}",
                     a_line.name);
                 return false;
             }
@@ -348,14 +348,14 @@ namespace TradeTogether::AutoTransfer
 
             if (candidates.empty()) {
                 a_error = fmt::format(
-                    "aucune entree STRPM compatible pour {}",
+                    "no matching STRPM inventory entry for {}",
                     a_line.name);
                 return false;
             }
 
             if (candidates.size() > 1) {
                 a_error = fmt::format(
-                    "plusieurs entrees STRPM correspondent a {} ; transfert ambigu",
+                    "multiple STRPM inventory entries match {}; transfer is ambiguous",
                     a_line.name);
                 return false;
             }
@@ -402,14 +402,14 @@ namespace TradeTogether::AutoTransfer
                 }
 
                 if (selected) {
-                    a_error = "plusieurs piles STRPM de septims compatibles";
+                    a_error = "multiple compatible STRPM gold stacks";
                     return false;
                 }
                 selected = std::addressof(item);
             }
 
             if (!selected) {
-                a_error = "septims insuffisants ou absents du snapshot STRPM";
+                a_error = "insufficient gold or gold missing from STRPM snapshot";
                 return false;
             }
 
@@ -417,7 +417,7 @@ namespace TradeTogether::AutoTransfer
             a_out.entry = selected->entry;
             a_out.entry.count = static_cast<std::int32_t>(a_gold);
             a_out.localFormID = kGoldFormID;
-            a_out.name = "septims";
+            a_out.name = "gold";
             return true;
         }
 
@@ -449,7 +449,7 @@ namespace TradeTogether::AutoTransfer
                     line.quantity == 0 ||
                     line.name.empty() ||
                     line.instanceData.empty()) {
-                    a_error = "offre locale invalide";
+                    a_error = "invalid local offer";
                     return false;
                 }
 
@@ -490,7 +490,7 @@ namespace TradeTogether::AutoTransfer
     {
         a_error.clear();
         if (!a_player) {
-            a_error = "joueur local indisponible";
+            a_error = "local player unavailable";
             return false;
         }
 
@@ -519,7 +519,7 @@ namespace TradeTogether::AutoTransfer
     {
         a_error.clear();
         if (!a_player) {
-            a_error = "joueur local indisponible";
+            a_error = "local player unavailable";
             return false;
         }
 
@@ -543,7 +543,7 @@ namespace TradeTogether::AutoTransfer
         }
 
         if (a_peerName.empty()) {
-            a_error = "partenaire STR introuvable";
+            a_error = "STR trade partner not found";
             return false;
         }
 
@@ -551,7 +551,7 @@ namespace TradeTogether::AutoTransfer
             UdpTransport::GetSingleton().ResolvePlayerConnectionID(
                 a_peerName);
         if (!peerConnection || *peerConnection == 0) {
-            a_error = "ConnectionID STR du partenaire introuvable";
+            a_error = "trade partner STR ConnectionID not found";
             return false;
         }
 
@@ -564,7 +564,7 @@ namespace TradeTogether::AutoTransfer
             if (result != STRPM::Result::kOk ||
                 transferID == 0) {
                 a_error = fmt::format(
-                    "Inventory Bridge refuse {} ({})",
+                    "Inventory Bridge rejected {} ({})",
                     transfer.name,
                     STRPM::ResultToString(result));
                 spdlog::error(
