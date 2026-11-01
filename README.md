@@ -7,7 +7,7 @@ STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 - Skyrim Special Edition / Anniversary Edition
 - SKSE
 - Skyrim Together Reborn
-- STR Plugin Messaging API **0.11.3 inventory-service build** with Proxy Resolver and Inventory Bridge support
+- STR Plugin Messaging API **0.11.4 inventory-service build** with Proxy Resolver and Inventory Bridge support
 - The same TradeTogether build on every player
 - SkyUI for the optional MCM
 
