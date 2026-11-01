@@ -19,6 +19,8 @@ namespace TradeTogether
         [[nodiscard]] bool IsRunning() const noexcept { return _running.load(); }
         [[nodiscard]] std::string GetLocalPlayerName() const;
         [[nodiscard]] std::optional<std::string> GetMostRecentPeerName();
+        [[nodiscard]] std::optional<STRPM::ConnectionID> ResolvePlayerConnectionID(
+            std::string_view a_playerName);
 
     private:
         static constexpr std::size_t kInboundQueueCapacity = 32;
