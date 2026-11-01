@@ -2,8 +2,8 @@
 setlocal
 cd /d "%~dp0"
 set "TRADETOGETHER_BUILD_DIR=out\build-release"
-set "TRADETOGETHER_VERSION=0.13.1-strpm-inventory"
-set "TRADETOGETHER_PUBLIC_VERSION=0.13.1"
+set "TRADETOGETHER_VERSION=0.13.2-strpm-inventory"
+set "TRADETOGETHER_PUBLIC_VERSION=0.13.2"
 set "TRADETOGETHER_BUILT_DLL=%TRADETOGETHER_BUILD_DIR%\Release\TradeTogether.dll"
 set "TRADETOGETHER_PACKAGE_DLL=package\Data\SKSE\Plugins\TradeTogether.dll"
 
