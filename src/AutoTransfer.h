@@ -16,5 +16,6 @@ namespace TradeTogether::AutoTransfer
         const Offer& a_remoteOffer,
         std::uint32_t a_localGold,
         std::uint32_t a_remoteGold,
+        std::string_view a_peerName,
         std::string& a_error);
 }

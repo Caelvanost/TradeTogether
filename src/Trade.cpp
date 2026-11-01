@@ -115,7 +115,7 @@ namespace TradeTogether::Trade
             if (!player || !pickData) {
                 spdlog::warn(
                     "F6 ignored: PlayerCharacter or CrosshairPickData unavailable");
-                Notify("TradeTogether: ciblage indisponible.");
+                Notify("TradeTogether: targeting unavailable.");
                 return nullptr;
             }
 
@@ -125,7 +125,7 @@ namespace TradeTogether::Trade
             }
             if (!target) {
                 spdlog::info("F6: no crosshair target");
-                Notify("TradeTogether: vise l'autre joueur.");
+                Notify("TradeTogether: target the other player.");
                 return nullptr;
             }
 
@@ -134,12 +134,12 @@ namespace TradeTogether::Trade
                 spdlog::info(
                     "F6: target {:08X} is not an actor",
                     target->GetFormID());
-                Notify("TradeTogether: la cible n'est pas un acteur.");
+                Notify("TradeTogether: the target is not an actor.");
                 return nullptr;
             }
             if (actor == player) {
                 spdlog::info("F6: local player targeted; ignored");
-                Notify("TradeTogether: vise l'autre joueur.");
+                Notify("TradeTogether: target the other player.");
                 return nullptr;
             }
             return actor;
@@ -174,7 +174,7 @@ namespace TradeTogether::Trade
                 QueueInventoryMessage(RE::UI_MESSAGE_TYPE::kShow);
             }
             Notify(
-                "Offre: Insert/Suppr objets | PavNum +/- or | T valider | Tab annuler");
+                "Offer: Insert/Delete items | Numpad +/- gold | T review | Tab cancel");
         }
 
         void ScheduleOpenOfferInventory()
@@ -271,7 +271,7 @@ namespace TradeTogether::Trade
         {
             auto result = FormatOffer(a_title, a_offer);
             if (a_gold > 0) {
-                result += fmt::format("\n  {} septim(s)", a_gold);
+                result += fmt::format("\n  {} gold", a_gold);
             }
             return result;
         }
@@ -280,22 +280,22 @@ namespace TradeTogether::Trade
         {
             const auto& session = *GetState().session;
             std::string summary = a_final ?
-                "CONFIRMATION FINALE\n\n" : "OFFRES D'ECHANGE\n\n";
+                "FINAL CONFIRMATION\n\n" : "TRADE OFFERS\n\n";
             summary += FormatOfferAndGold(
-                "Votre offre :",
+                "Your offer:",
                 session.localOffer,
                 session.localGold);
             summary += "\n\n";
             summary += FormatOfferAndGold(
-                fmt::format("Offre de {} :", session.peerName),
+                fmt::format("Offer from {}:", session.peerName),
                 session.remoteOffer,
                 session.remoteGold);
             if (!a_final) {
                 summary += fmt::format(
-                    "\n\nEtat : vous {} | {} {}",
-                    session.localReady ? "etes pret" : "modifiez",
+                    "\n\nStatus: you are {} | {} {}",
+                    session.localReady ? "ready" : "editing",
                     session.peerName,
-                    session.remoteReady ? "est pret" : "modifie");
+                    session.remoteReady ? "is ready" : "is editing");
             }
             return summary;
         }
@@ -315,7 +315,7 @@ namespace TradeTogether::Trade
             QueueInventoryMessage(RE::UI_MESSAGE_TYPE::kHide);
             SendLocalState(true);
             Notify(fmt::format(
-                "TradeTogether: offre prete, attente de {}.",
+                "TradeTogether: offer ready, waiting for {}.",
                 state.session->peerName));
             if (state.session->remoteReady) {
                 ShowFinalPrompt();
@@ -363,8 +363,8 @@ namespace TradeTogether::Trade
                 0,
                 4,
                 10,
-                "Pret",
-                "Modifier");
+                "Ready",
+                "Modify");
         }
 
         void CancelSession(bool a_notifyPeer, std::string_view a_reason)
@@ -381,7 +381,7 @@ namespace TradeTogether::Trade
             QueueInventoryMessage(RE::UI_MESSAGE_TYPE::kHide);
             state.session.reset();
             Notify(fmt::format(
-                "TradeTogether: echange avec {} annule ({}).",
+                "TradeTogether: trade with {} cancelled ({}).",
                 peerName,
                 a_reason));
             spdlog::info(
@@ -410,10 +410,11 @@ namespace TradeTogether::Trade
                     session.remoteOffer,
                     session.localGold,
                     session.remoteGold,
+                    session.peerName,
                     transferError)) {
                 state.session.reset();
                 Notify(fmt::format(
-                    "TradeTogether: transfert annule ({})",
+                    "TradeTogether: transfer cancelled ({})",
                     transferError));
                 spdlog::error(
                     "Automatic trade transfer failed: request={} peer=\"{}\" reason=\"{}\"",
@@ -425,10 +426,10 @@ namespace TradeTogether::Trade
 
             state.session.reset();
             Notify(fmt::format(
-                "TradeTogether: echange automatique termine avec {}.",
+                "TradeTogether: STRPM transfers started with {}.",
                 session.peerName));
             spdlog::info(
-                "Automatic trade transfer completed: request={} peer=\"{}\" givenLines={} receivedLines={} givenGold={} receivedGold={}",
+                "STRPM trade transfers started: request={} peer=\"{}\" givenLines={} receivedLines={} givenGold={} receivedGold={}",
                 session.requestID,
                 session.peerName,
                 session.localOffer.size(),
@@ -445,7 +446,7 @@ namespace TradeTogether::Trade
             }
             state.session->finalPromptOpen = false;
             if (!state.session->localReady || !state.session->remoteReady) {
-                Notify("TradeTogether: une offre a change, verifiez a nouveau.");
+                Notify("TradeTogether: an offer changed. Please review it again.");
                 ShowOfferSummary();
                 return;
             }
@@ -460,7 +461,7 @@ namespace TradeTogether::Trade
                 ResetLocalApproval();
                 SendLocalState(false);
                 Notify(fmt::format(
-                    "TradeTogether: offre invalide ({})",
+                    "TradeTogether: invalid offer ({})",
                     validationError));
                 OpenOfferInventory();
                 return;
@@ -472,7 +473,7 @@ namespace TradeTogether::Trade
                 state.session->localRevision,
                 state.session->remoteRevision));
             Notify(fmt::format(
-                "TradeTogether: confirmation envoyee, attente de {}.",
+                "TradeTogether: confirmation sent, waiting for {}.",
                 state.session->peerName));
             FinalizeIfComplete();
         }
@@ -523,8 +524,8 @@ namespace TradeTogether::Trade
                 0,
                 4,
                 10,
-                "Confirmer",
-                "Modifier");
+                "Confirm",
+                "Modify");
         }
 
         RE::ItemList::Item* GetSelectedInventoryItem()
@@ -550,7 +551,7 @@ namespace TradeTogether::Trade
 
             auto* selected = GetSelectedInventoryItem();
             if (!selected || !selected->data.objDesc) {
-                Notify("TradeTogether: selectionne un objet dans ton inventaire.");
+                Notify("TradeTogether: select an item in your inventory.");
                 return;
             }
 
@@ -559,15 +560,15 @@ namespace TradeTogether::Trade
             const auto* displayName = entry->GetDisplayName();
             const auto available = selected->data.GetCount();
             if (!object || !displayName || !*displayName || available == 0) {
-                Notify("TradeTogether: cet objet ne peut pas etre ajoute.");
+                Notify("TradeTogether: this item cannot be added.");
                 return;
             }
             if (object->GetFormID() == kGoldFormID) {
-                Notify("TradeTogether: utilise la touche d'or configuree.");
+                Notify("TradeTogether: use the configured gold key.");
                 return;
             }
             if (entry->IsQuestObject()) {
-                Notify("TradeTogether: les objets de quete ne peuvent pas etre offerts.");
+                Notify("TradeTogether: quest items cannot be offered.");
                 return;
             }
 
@@ -603,7 +604,7 @@ namespace TradeTogether::Trade
                             snapshot,
                             snapshotError)) {
                         Notify(fmt::format(
-                            "TradeTogether: {} ne peut pas etre echange a l'identique ({}).",
+                            "TradeTogether: {} cannot be traded exactly ({}).",
                             displayName,
                             snapshotError));
                         spdlog::warn(
@@ -688,7 +689,7 @@ namespace TradeTogether::Trade
                         chosenStack = std::addressof(stack);
                         if (iterator == offer.end()) {
                             if (offer.size() >= 24) {
-                                Notify("TradeTogether: l'offre est limitee a 24 lignes.");
+                                Notify("TradeTogether: the offer is limited to 24 item lines.");
                                 return;
                             }
                             offer.push_back(OfferLine{
@@ -708,7 +709,7 @@ namespace TradeTogether::Trade
                 }
 
                 if (!chosenLine || !chosenStack) {
-                    Notify("TradeTogether: toute cette pile est deja dans l'offre.");
+                    Notify("TradeTogether: the entire stack is already in the offer.");
                     return;
                 }
 
@@ -716,7 +717,7 @@ namespace TradeTogether::Trade
                 ResetLocalApproval();
                 SendLocalState(false);
                 Notify(fmt::format(
-                    "Offre: {} x {}",
+                    "Offer: {} x {}",
                     chosenLine->quantity,
                     chosenLine->name));
             } else {
@@ -728,7 +729,7 @@ namespace TradeTogether::Trade
                                a_line.name == displayName;
                     });
                 if (iterator == offer.rend()) {
-                    Notify("TradeTogether: cet objet n'est pas dans l'offre.");
+                    Notify("TradeTogether: this item is not in the offer.");
                     return;
                 }
 
@@ -741,7 +742,7 @@ namespace TradeTogether::Trade
                 ResetLocalApproval();
                 SendLocalState(false);
                 Notify(fmt::format(
-                    "Offre mise a jour: {}",
+                    "Offer updated: {}",
                     displayName));
             }
 
@@ -814,16 +815,16 @@ namespace TradeTogether::Trade
                 if (a_accepted) {
                     state.session.reset();
                 }
-                Notify("TradeTogether: impossible d'envoyer la reponse.");
+                Notify("TradeTogether: could not send the response.");
                 return;
             }
 
             if (expired) {
-                Notify("TradeTogether: cette demande a expire.");
+                Notify("TradeTogether: this trade request expired.");
             } else {
                 Notify(fmt::format(
-                    "TradeTogether: echange {} pour {}.",
-                    a_accepted ? "accepte" : "refuse",
+                    "TradeTogether: trade {} for {}.",
+                    a_accepted ? "accepted" : "declined",
                     a_requester));
             }
             spdlog::info(
@@ -876,13 +877,13 @@ namespace TradeTogether::Trade
             if (state.session || state.pending) {
                 SendResponse(a_requestID, a_requester, false);
                 spdlog::info(
-                    "Trade request refused automatically: busy with another trade");
+                    "Trade request declinedd automatically: busy with another trade");
                 return;
             }
 
             const auto prompt = fmt::format(
-                "{} souhaite echanger avec vous.\n"
-                "Accepter et composer votre offre ?",
+                "{} wants to trade with you.\n"
+                "Accept and compose your offer?",
                 a_requester);
             RE::CreateMessage(
                 prompt.c_str(),
@@ -893,8 +894,8 @@ namespace TradeTogether::Trade
                 0,
                 4,
                 10,
-                "Accepter",
-                "Refuser");
+                "Accept",
+                "Decline");
             spdlog::info(
                 "Trade confirmation displayed: request={} requester=\"{}\"",
                 a_requestID,
@@ -923,12 +924,12 @@ namespace TradeTogether::Trade
             state.pending.reset();
             if (std::chrono::steady_clock::now() - pending.sentAt >
                 std::chrono::milliseconds(state.config.requestTimeoutMs)) {
-                Notify("TradeTogether: la demande d'echange a expire.");
+                Notify("TradeTogether: the trade request expired.");
                 return;
             }
             if (!a_accepted) {
                 Notify(fmt::format(
-                    "TradeTogether: {} a refuse l'echange.",
+                    "TradeTogether: {} declined the trade.",
                     a_responder));
                 return;
             }
@@ -936,13 +937,13 @@ namespace TradeTogether::Trade
             auto actor = pending.target.get();
             auto* player = RE::PlayerCharacter::GetSingleton();
             if (!actor || actor.get() == player) {
-                Notify("TradeTogether: le joueur cible n'est plus disponible.");
+                Notify("TradeTogether: the target player is no longer available.");
                 return;
             }
             const auto currentName = GetActorName(actor.get());
             if (currentName.empty() ||
                 !Protocol::EqualsInsensitive(currentName, pending.targetName)) {
-                Notify("TradeTogether: la cible de l'echange a change.");
+                Notify("TradeTogether: the trade target changed.");
                 return;
             }
 
@@ -953,7 +954,7 @@ namespace TradeTogether::Trade
                 pending.target,
                 pending.targetFormID);
             Notify(fmt::format(
-                "TradeTogether: {} a accepte. Compose ton offre.",
+                "TradeTogether: {} accepted. Compose your offer.",
                 pending.targetName));
         }
 
@@ -962,7 +963,7 @@ namespace TradeTogether::Trade
             auto& state = GetState();
             if (!state.initialized ||
                 !UdpTransport::GetSingleton().IsRunning()) {
-                Notify("TradeTogether: confirmation reseau indisponible.");
+                Notify("TradeTogether: network confirmation unavailable.");
                 return false;
             }
             if (state.session) {
@@ -971,7 +972,7 @@ namespace TradeTogether::Trade
             }
             if (state.pending) {
                 Notify(fmt::format(
-                    "TradeTogether: en attente de {}.",
+                    "TradeTogether: waiting for {}.",
                     state.pending->targetName));
                 return false;
             }
@@ -982,7 +983,7 @@ namespace TradeTogether::Trade
             }
             const auto displayName = GetActorName(actor);
             if (displayName.empty()) {
-                Notify("TradeTogether: la cible n'a pas de nom reseau.");
+                Notify("TradeTogether: the target has no network name.");
                 return false;
             }
 
@@ -1000,12 +1001,12 @@ namespace TradeTogether::Trade
             };
             if (!UdpTransport::GetSingleton().SendTo(displayName, payload)) {
                 state.pending.reset();
-                Notify("TradeTogether: impossible d'envoyer la demande.");
+                Notify("TradeTogether: could not send the trade request.");
                 return false;
             }
 
             Notify(fmt::format(
-                "TradeTogether: demande envoyee a {}.",
+                "TradeTogether: trade request sent to {}.",
                 displayName));
             spdlog::info(
                 "Trade requested: request={} form={:08X} name=\"{}\"",
@@ -1072,13 +1073,13 @@ namespace TradeTogether::Trade
                 state.pending->requestID,
                 state.pending->targetName);
             state.pending.reset();
-            Notify("TradeTogether: aucune reponse, demande expiree.");
+            Notify("TradeTogether: no response, trade request expired.");
         }
 
         if (state.session &&
             now - state.session->lastActivity >
                 std::chrono::milliseconds(state.config.sessionTimeoutMs)) {
-            CancelSession(true, "delai depasse");
+            CancelSession(true, "timed out");
         }
 
         const auto historyLifetime = std::max(
@@ -1100,7 +1101,7 @@ namespace TradeTogether::Trade
 
         auto& state = GetState();
         if (a_scanCode == kTabScanCode && state.session) {
-            CancelSession(true, "annulation locale");
+            CancelSession(true, "cancelled locally");
             return;
         }
         if (a_scanCode == kEScanCode && state.session) {
@@ -1128,7 +1129,7 @@ namespace TradeTogether::Trade
         auto* player = RE::PlayerCharacter::GetSingleton();
         auto* gold = RE::TESForm::LookupByID<RE::TESBoundObject>(kGoldFormID);
         if (!player || !gold) {
-            Notify("TradeTogether: impossible de lire tes septims.");
+            Notify("TradeTogether: could not read your gold.");
             return;
         }
 
@@ -1142,7 +1143,7 @@ namespace TradeTogether::Trade
         const auto next = std::clamp<std::int64_t>(requested, 0, available);
         if (next == current) {
             Notify(fmt::format(
-                "Offre: {} septim(s) ({} disponible(s))",
+                "Offer: {} gold ({} available)",
                 current,
                 available));
             return;
@@ -1152,7 +1153,7 @@ namespace TradeTogether::Trade
         ResetLocalApproval();
         SendLocalState(false);
         Notify(fmt::format(
-            "Offre: {} septim(s) / {} disponible(s)",
+            "Offer: {} gold / {} available",
             state.session->localGold,
             available));
         spdlog::info(
@@ -1251,7 +1252,7 @@ namespace TradeTogether::Trade
             Notify(fmt::format(
                 "TradeTogether: {} {}.",
                 state.session->peerName,
-                state.session->remoteReady ? "est pret" : "modifie son offre"));
+                state.session->remoteReady ? "is ready" : "is editing the offer"));
             if (state.session->localReady && state.session->remoteReady) {
                 ShowFinalPrompt();
             }
@@ -1275,13 +1276,13 @@ namespace TradeTogether::Trade
             }
             state.session->remoteConfirmed = true;
             Notify(fmt::format(
-                "TradeTogether: {} a confirme l'echange.",
+                "TradeTogether: {} confirmed the trade.",
                 state.session->peerName));
             FinalizeIfComplete();
             return;
         }
         if (*type == "CANCEL") {
-            CancelSession(false, "annulation distante");
+            CancelSession(false, "cancelled remotely");
             return;
         }
 
