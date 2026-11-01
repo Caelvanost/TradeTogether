@@ -1,4 +1,4 @@
-# TradeTogether v0.13.1-strpm-inventory
+# TradeTogether v0.13.2-strpm-inventory
 
 STR Plugin Messaging edition of TradeTogether for Skyrim Together Reborn.
 
@@ -26,7 +26,7 @@ TradeTogether itself opens no UDP socket and requires no TradeTogether-specific 
 
 Quest items are rejected. Item-only, gold-only, mixed item/gold trades and one-way gifts are supported.
 
-## v0.13.1 — STRPM Inventory Bridge v2 integration
+## v0.13.2 — STRPM Inventory Bridge v2 integration
 
 v0.13.0 keeps the exact stack-selection protocol introduced in v0.12.5 (`TTNET|v2|` + `instanceData`) but replaces TradeTogether's local debit/rebuild/credit path with STRPM 0.11.0's canonical Inventory Bridge.
 
@@ -237,11 +237,11 @@ Documents/My Games/Skyrim Special Edition/SKSE/TradeTogether.log
 Expected v0.12.5 startup entries include:
 
 ```text
-TradeTogether v0.13.1-strpm-inventory loading
+TradeTogether v0.13.2-strpm-inventory loading
 TradeTogether Papyrus MCM bridge registered
 TradeTogether controls loaded: trade=... add=... remove=... goldAdd=... goldRemove=... cancel=...
 TradeTogether STRPM deferred receive dispatcher started
-TradeTogether v0.13.1-strpm-inventory ready ... network=ready
+TradeTogether v0.13.2-strpm-inventory ready ... network=ready
 ```
 
 Changing a key through the MCM should log:
@@ -253,7 +253,7 @@ TradeTogether controls loaded: ...
 
 ## Current status
 
-`v0.13.1-strpm-inventory` is under development on the `inventory-bridge-v013` branch. It is based on v0.12.5 and replaces manual ExtraData reconstruction with STRPM 0.11.0 Inventory Bridge transfers. It must compile and pass the two-client regression matrix before merging or publishing.
+`v0.13.2-strpm-inventory` is under development on the `inventory-bridge-v013` branch. It is based on v0.12.5 and replaces manual ExtraData reconstruction with STRPM 0.11.0 Inventory Bridge transfers. It must compile and pass the two-client regression matrix before merging or publishing.
 
 The existing v0.10.0 STR trade flow and Skyrim Souls RE compatibility remain the validated gameplay baseline carried forward by this release.
 
@@ -275,5 +275,5 @@ set "SKYUI_SOURCE=C:\path\to\SkyUI\scripts\source"
 Expected archive name:
 
 ```text
-dist/TradeTogether-0.13.1.zip
+dist/TradeTogether-0.13.2.zip
 ```
