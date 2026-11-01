@@ -223,7 +223,7 @@ namespace TradeTogether::InstanceData
             if (!enchantment->IsDynamicForm()) {
                 a_out.enchantmentFormID = enchantment->GetFormID();
                 if (a_out.enchantmentFormID == 0) {
-                    a_error = "enchantement statique sans FormID";
+                    a_error = "static enchantment has no FormID";
                     return false;
                 }
                 return true;
@@ -232,14 +232,14 @@ namespace TradeTogether::InstanceData
             a_out.dynamicEnchantment = true;
             if (enchantment->effects.empty() ||
                 enchantment->effects.size() > kMaximumEffects) {
-                a_error = "enchantement dynamique trop complexe";
+                a_error = "dynamic enchantment is too complex";
                 return false;
             }
 
             for (const auto* effect : enchantment->effects) {
                 if (!effect || !effect->baseEffect ||
                     effect->baseEffect->GetFormID() == 0) {
-                    a_error = "effet d'enchantement dynamique non serialisable";
+                    a_error = "dynamic enchantment effect is not serializable";
                     return false;
                 }
                 a_out.enchantmentEffects.push_back(EffectSnapshot{
@@ -268,7 +268,7 @@ namespace TradeTogether::InstanceData
                         a_snapshot.enchantmentFormID);
                 if (!enchantment) {
                     a_error = fmt::format(
-                        "enchantement introuvable localement: {:08X}",
+                        "enchantment not found locally: {:08X}",
                         a_snapshot.enchantmentFormID);
                 }
                 return enchantment;
@@ -277,7 +277,7 @@ namespace TradeTogether::InstanceData
             if (!a_object ||
                 (a_object->GetFormType() != RE::FormType::Weapon &&
                  a_object->GetFormType() != RE::FormType::Armor)) {
-                a_error = "enchantement dynamique sur un type d'objet invalide";
+                a_error = "dynamic enchantment is attached to an invalid item type";
                 return nullptr;
             }
 
@@ -290,7 +290,7 @@ namespace TradeTogether::InstanceData
             };
             auto* manager = *managerSingleton;
             if (!manager) {
-                a_error = "BGSCreatedObjectManager indisponible";
+                a_error = "BGSCreatedObjectManager unavailable";
                 return nullptr;
             }
 
@@ -304,7 +304,7 @@ namespace TradeTogether::InstanceData
                         encoded.effectFormID);
                 if (!setting) {
                     a_error = fmt::format(
-                        "MagicEffect introuvable localement: {:08X}",
+                        "MagicEffect not found locally: {:08X}",
                         encoded.effectFormID);
                     return nullptr;
                 }
@@ -332,7 +332,7 @@ namespace TradeTogether::InstanceData
                     addWeaponEnchantment(manager, effects) :
                     addArmorEnchantment(manager, effects);
             if (!enchantment) {
-                a_error = "creation de l'enchantement dynamique impossible";
+                a_error = "could not create dynamic enchantment";
             }
             return enchantment;
         }
@@ -366,7 +366,7 @@ namespace TradeTogether::InstanceData
             const auto type = extra.GetType();
             if (!IsIgnorableLocalExtra(type) && !IsSupportedIntrinsicExtra(type)) {
                 a_error = fmt::format(
-                    "ExtraData non supportee pour transfert exact: 0x{:02X}",
+                    "unsupported ExtraData for exact transfer: 0x{:02X}",
                     static_cast<std::uint32_t>(type));
                 return false;
             }
@@ -374,7 +374,7 @@ namespace TradeTogether::InstanceData
 
         if (const auto* health = a_extraList->GetByType<RE::ExtraHealth>()) {
             if (!std::isfinite(health->health)) {
-                a_error = "valeur de tempering invalide";
+                a_error = "invalid tempering value";
                 return false;
             }
             a_out.health = health->health;
@@ -382,7 +382,7 @@ namespace TradeTogether::InstanceData
 
         if (const auto* charge = a_extraList->GetByType<RE::ExtraCharge>()) {
             if (!std::isfinite(charge->charge)) {
-                a_error = "charge d'enchantement invalide";
+                a_error = "invalid enchantment charge";
                 return false;
             }
             a_out.charge = charge->charge;
@@ -419,7 +419,7 @@ namespace TradeTogether::InstanceData
         if (const auto* poison = a_extraList->GetByType<RE::ExtraPoison>()) {
             if (!poison->poison || poison->poison->GetFormID() == 0 ||
                 poison->count == 0) {
-                a_error = "poison d'arme non serialisable";
+                a_error = "weapon poison is not serializable";
                 return false;
             }
             a_out.poisonFormID = poison->poison->GetFormID();
@@ -645,7 +645,7 @@ namespace TradeTogether::InstanceData
         std::string& a_error)
     {
         if (!a_object) {
-            a_error = "objet de base indisponible";
+            a_error = "base object unavailable";
             return nullptr;
         }
         if (IsEmpty(a_snapshot)) {
@@ -695,7 +695,7 @@ namespace TradeTogether::InstanceData
                 RE::TESForm::LookupByID(*a_snapshot.ownershipFormID);
             if (!owner) {
                 a_error = fmt::format(
-                    "owner introuvable localement: {:08X}",
+                    "owner not found locally: {:08X}",
                     *a_snapshot.ownershipFormID);
                 delete extraList;
                 return nullptr;
@@ -718,7 +718,7 @@ namespace TradeTogether::InstanceData
                     *a_snapshot.poisonFormID);
             if (!poison) {
                 a_error = fmt::format(
-                    "poison introuvable localement: {:08X}",
+                    "poison not found locally: {:08X}",
                     *a_snapshot.poisonFormID);
                 delete extraList;
                 return nullptr;
