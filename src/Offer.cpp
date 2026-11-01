@@ -137,7 +137,7 @@ namespace TradeTogether
         std::string result(a_title);
         result += "\n";
         if (a_offer.empty()) {
-            result += "  (aucun objet)";
+            result += "  (no items)";
             return result;
         }
 
@@ -150,7 +150,7 @@ namespace TradeTogether
         }
         if (visible < a_offer.size()) {
             result += fmt::format(
-                "  ... et {} autre(s)",
+                "  ... and {} more",
                 a_offer.size() - visible);
         } else if (!result.empty() && result.back() == '\n') {
             result.pop_back();
