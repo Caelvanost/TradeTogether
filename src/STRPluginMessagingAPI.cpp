@@ -97,6 +97,26 @@ namespace STRPM
         return resolver;
     }
 
+    const InventoryInterface* LoadInventoryFromModule(const wchar_t* a_moduleName) noexcept
+    {
+        const auto module = LoadPluginModule(a_moduleName);
+        if (!module) {
+            return nullptr;
+        }
+        const auto rawExport = GetProcAddress(module, kQueryInventoryExportName);
+        if (!rawExport) {
+            return nullptr;
+        }
+        const auto query = reinterpret_cast<QueryInventoryInterfaceFn>(rawExport);
+        const InventoryInterface* inventory = nullptr;
+        if (query(kInventoryInterfaceVersion, &inventory) != Result::kOk ||
+            !inventory ||
+            inventory->version != kInventoryInterfaceVersion) {
+            return nullptr;
+        }
+        return inventory;
+    }
+
     const char* ResultToString(Result a_result) noexcept
     {
         switch (a_result) {
@@ -111,6 +131,9 @@ namespace STRPM
         case Result::kRateLimited: return "rate limited";
         case Result::kTransportError: return "transport error";
         case Result::kTargetNotFound: return "target not found";
+        case Result::kBufferTooSmall: return "buffer too small";
+        case Result::kBusy: return "busy";
+        case Result::kUnsupportedItem: return "unsupported item";
         default: return "unknown result";
         }
     }
