@@ -163,25 +163,6 @@ namespace TradeTogether::AutoTransfer
             return false;
         }
 
-        bool HasBridgeUnsupportedMetadata(
-            const InstanceData::Snapshot& a_snapshot,
-            std::string& a_reason)
-        {
-            if (a_snapshot.customName) {
-                a_reason = "nom personnalise non transporte par Inventory Bridge v1";
-                return true;
-            }
-            if (a_snapshot.ownershipFormID || a_snapshot.ownershipRank) {
-                a_reason = "ownership/rank non transporte par Inventory Bridge v1";
-                return true;
-            }
-            if (a_snapshot.cannotWear) {
-                a_reason = "CannotWear non transporte par Inventory Bridge v1";
-                return true;
-            }
-            return false;
-        }
-
         bool MatchesEffectShape(
             const InstanceData::EffectSnapshot& a_snapshot,
             const STRPM::InventoryEffect& a_effect)
@@ -194,11 +175,59 @@ namespace TradeTogether::AutoTransfer
                    FloatEqual(a_snapshot.cost, a_effect.rawCost);
         }
 
+        bool MatchesExtendedMetadata(
+            const InstanceData::Snapshot& a_snapshot,
+            const STRPM::InventoryEntry& a_entry)
+        {
+            const bool hasCustomName =
+                (a_entry.flags & STRPM::kInventoryEntryHasCustomName) != 0;
+            if (a_snapshot.customName) {
+                if (!hasCustomName ||
+                    a_entry.customNameLength != a_snapshot.customName->size() ||
+                    std::string_view(
+                        a_entry.customName,
+                        a_entry.customNameLength) != *a_snapshot.customName) {
+                    return false;
+                }
+            } else if (hasCustomName) {
+                return false;
+            }
+
+            const bool hasOwnership =
+                (a_entry.flags & STRPM::kInventoryEntryHasOwnership) != 0;
+            if (a_snapshot.ownershipFormID.has_value() != hasOwnership) {
+                return false;
+            }
+
+            const bool hasOwnerRank =
+                (a_entry.flags & STRPM::kInventoryEntryHasOwnerRank) != 0;
+            if (a_snapshot.ownershipRank) {
+                if (!hasOwnerRank ||
+                    a_entry.ownerRank != *a_snapshot.ownershipRank) {
+                    return false;
+                }
+            } else if (hasOwnerRank) {
+                return false;
+            }
+
+            const bool cannotWear =
+                (a_entry.flags & STRPM::kInventoryEntryCannotWear) != 0;
+            if (cannotWear != a_snapshot.cannotWear) {
+                return false;
+            }
+
+            return true;
+        }
+
         bool MatchesPortableEntry(
             const InstanceData::Snapshot& a_snapshot,
             const STRPM::InventoryEntry& a_entry)
         {
             if (a_entry.count <= 0) {
+                return false;
+            }
+
+            if (!MatchesExtendedMetadata(a_snapshot, a_entry)) {
                 return false;
             }
 
@@ -299,15 +328,6 @@ namespace TradeTogether::AutoTransfer
                 a_error = fmt::format(
                     "etat d'instance invalide pour {}",
                     a_line.name);
-                return false;
-            }
-
-            std::string unsupportedReason;
-            if (HasBridgeUnsupportedMetadata(*snapshot, unsupportedReason)) {
-                a_error = fmt::format(
-                    "{}: {}",
-                    a_line.name,
-                    unsupportedReason);
                 return false;
             }
 
