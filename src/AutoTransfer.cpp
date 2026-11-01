@@ -3,6 +3,7 @@
 #include "InstanceData.h"
 #include "UdpTransport.h"
 
+#include <bit>
 #include <cmath>
 
 namespace TradeTogether::AutoTransfer
