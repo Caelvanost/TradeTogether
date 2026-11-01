@@ -1,6 +1,9 @@
 #include "PCH.h"
 #include "AutoTransfer.h"
 #include "InstanceData.h"
+#include "UdpTransport.h"
+
+#include <cmath>
 
 namespace TradeTogether::AutoTransfer
 {
@@ -8,247 +11,452 @@ namespace TradeTogether::AutoTransfer
     {
         constexpr RE::FormID kGoldFormID = 0x0000000F;
 
-        struct StackMatch
+        bool IsZeroGameId(const STRPM::InventoryGameId& a_id)
         {
-            RE::ExtraDataList* extraList{ nullptr };
-            std::int32_t count{ 0 };
-        };
-
-        struct TransferPlan
-        {
-            RE::TESBoundObject* object{ nullptr };
-            std::vector<StackMatch> stacks;
-            std::int32_t baseCount{ 0 };
-            std::int32_t available{ 0 };
-        };
-
-        struct IncomingStack
-        {
-            RE::TESBoundObject* object{ nullptr };
-            RE::ExtraDataList* extraList{ nullptr };
-            std::int32_t count{ 0 };
-            std::string name;
-            RE::FormID formID{ 0 };
-        };
-
-        RE::TESBoundObject* LookupObject(RE::FormID a_formID)
-        {
-            return RE::TESForm::LookupByID<RE::TESBoundObject>(a_formID);
+            return a_id.baseId == 0 && a_id.modId == 0;
         }
 
-        std::int32_t GetObjectCount(
-            RE::PlayerCharacter* a_player,
-            RE::TESBoundObject* a_object)
+        bool FloatEqual(float a_left, float a_right)
         {
-            if (!a_player || !a_object) {
-                return 0;
+            return std::bit_cast<std::uint32_t>(a_left) ==
+                   std::bit_cast<std::uint32_t>(a_right);
+        }
+
+        const char* TransferStateName(STRPM::InventoryTransferState a_state)
+        {
+            switch (a_state) {
+            case STRPM::InventoryTransferState::kPrepared:
+                return "prepared";
+            case STRPM::InventoryTransferState::kRemovingLocal:
+                return "removing-local";
+            case STRPM::InventoryTransferState::kCommitting:
+                return "committing";
+            case STRPM::InventoryTransferState::kApplyingRemote:
+                return "applying-remote";
+            case STRPM::InventoryTransferState::kComplete:
+                return "complete";
+            case STRPM::InventoryTransferState::kFailed:
+                return "failed";
+            case STRPM::InventoryTransferState::kRolledBack:
+                return "rolled-back";
+            default:
+                return "unknown";
+            }
+        }
+
+        void NotifyOnGameThread(std::string a_message)
+        {
+            auto task = [message = std::move(a_message)]() {
+                RE::DebugNotification(message.c_str());
+            };
+
+            if (auto* tasks = SKSE::GetTaskInterface()) {
+                tasks->AddTask(std::move(task));
+            } else {
+                task();
+            }
+        }
+
+        void STRPM_CALL OnInventoryTransfer(
+            const STRPM::InventoryTransferEvent* a_event,
+            void*)
+        {
+            if (!a_event) {
+                return;
             }
 
-            const auto counts = a_player->GetInventoryCounts();
-            const auto iterator = counts.find(a_object);
-            return iterator != counts.end() ? std::max(iterator->second, 0) : 0;
-        }
+            spdlog::info(
+                "STRPM inventory transfer event: id={} peer={} state={} result={} gameId={:08X}:{:08X} count={}",
+                a_event->transferID,
+                a_event->peerConnectionID,
+                TransferStateName(a_event->state),
+                STRPM::ResultToString(a_event->result),
+                a_event->entry.baseId.modId,
+                a_event->entry.baseId.baseId,
+                a_event->entry.count);
 
-        void DestroyIncoming(std::vector<IncomingStack>& a_incoming)
-        {
-            for (auto& stack : a_incoming) {
-                delete stack.extraList;
-                stack.extraList = nullptr;
+            if (a_event->state == STRPM::InventoryTransferState::kFailed ||
+                a_event->state == STRPM::InventoryTransferState::kRolledBack) {
+                NotifyOnGameThread(fmt::format(
+                    "TradeTogether: transfert STRPM echoue ({})",
+                    STRPM::ResultToString(a_event->result)));
             }
-            a_incoming.clear();
         }
 
-        TransferPlan BuildTransferPlan(
-            RE::PlayerCharacter* a_player,
-            const OfferLine& a_line,
+        const STRPM::InventoryInterface* GetInventoryInterface(
             std::string& a_error)
         {
-            TransferPlan plan{};
-            plan.object = LookupObject(a_line.formID);
-            if (!a_player || !plan.object) {
-                return plan;
+            const auto* inventory = STRPM::LoadInventoryFromModule();
+            if (!inventory ||
+                inventory->version != STRPM::kInventoryInterfaceVersion ||
+                !inventory->getLocalInventory ||
+                !inventory->transfer) {
+                a_error = "Inventory Bridge STRPM indisponible";
+                return nullptr;
             }
 
-            const auto inventory = a_player->GetInventory();
-            const auto iterator = inventory.find(plan.object);
-            if (iterator == inventory.end()) {
-                return plan;
-            }
-
-            const auto totalCount = std::max(iterator->second.first, 0);
-            auto* entry = iterator->second.second.get();
-
-            std::int32_t representedByExtraLists = 0;
-            if (entry && entry->extraLists) {
-                for (auto* extraList : *entry->extraLists) {
-                    if (!extraList) {
-                        continue;
-                    }
-
-                    const auto stackCount = std::max(extraList->GetCount(), 1);
-                    representedByExtraLists += stackCount;
-
-                    InstanceData::Snapshot snapshot{};
-                    std::string snapshotError;
-                    if (!InstanceData::Capture(
-                            plan.object,
-                            extraList,
-                            snapshot,
-                            snapshotError)) {
-                        // Unsupported ExtraData only blocks this offer line when
-                        // the displayed instance could be the one being traded.
-                        const auto* displayName =
-                            extraList->GetDisplayName(plan.object);
-                        if (displayName && a_line.name == displayName) {
-                            a_error = fmt::format(
-                                "{}: {}",
-                                a_line.name,
-                                snapshotError);
-                            return {};
-                        }
-                        continue;
-                    }
-
-                    if (InstanceData::Encode(snapshot) == a_line.instanceData) {
-                        plan.stacks.push_back({ extraList, stackCount });
-                        plan.available += stackCount;
-                    }
+            static std::mutex listenerMutex;
+            static const STRPM::InventoryInterface* registeredInterface = nullptr;
+            std::scoped_lock lock(listenerMutex);
+            if (registeredInterface != inventory &&
+                inventory->registerTransferListener) {
+                const auto result = inventory->registerTransferListener(
+                    &OnInventoryTransfer,
+                    nullptr);
+                if (result == STRPM::Result::kOk) {
+                    registeredInterface = inventory;
+                } else {
+                    spdlog::warn(
+                        "STRPM inventory listener registration failed: {}",
+                        STRPM::ResultToString(result));
                 }
             }
 
-            plan.baseCount =
-                std::max(totalCount - representedByExtraLists, 0);
-            if (a_line.instanceData == "-" && plan.baseCount > 0) {
-                plan.available += plan.baseCount;
-            } else {
-                plan.baseCount = 0;
-            }
-
-            return plan;
+            return inventory;
         }
 
-        bool ValidateLine(
-            RE::PlayerCharacter* a_player,
-            const OfferLine& a_line,
+        bool SnapshotLocalInventory(
+            const STRPM::InventoryInterface* a_inventory,
+            std::vector<STRPM::InventoryItem>& a_items,
             std::string& a_error)
         {
-            if (a_line.formID == 0 ||
-                a_line.quantity == 0 ||
-                a_line.name.empty() ||
-                a_line.instanceData.empty() ||
-                !InstanceData::Decode(a_line.instanceData)) {
-                a_error = "offre locale invalide";
+            a_items.clear();
+
+            for (int attempt = 0; attempt < 2; ++attempt) {
+                std::size_t count = 0;
+                auto result =
+                    a_inventory->getLocalInventory(nullptr, 0, &count);
+                if (result != STRPM::Result::kOk) {
+                    a_error = fmt::format(
+                        "snapshot STRPM impossible ({})",
+                        STRPM::ResultToString(result));
+                    return false;
+                }
+
+                if (count == 0) {
+                    return true;
+                }
+
+                a_items.assign(count, STRPM::InventoryItem{});
+                auto returned = count;
+                result = a_inventory->getLocalInventory(
+                    a_items.data(),
+                    a_items.size(),
+                    &returned);
+
+                if (result == STRPM::Result::kBufferTooSmall) {
+                    continue;
+                }
+                if (result != STRPM::Result::kOk) {
+                    a_error = fmt::format(
+                        "snapshot STRPM impossible ({})",
+                        STRPM::ResultToString(result));
+                    return false;
+                }
+
+                a_items.resize(returned);
+                return true;
+            }
+
+            a_error = "inventaire modifie pendant le snapshot STRPM";
+            return false;
+        }
+
+        bool HasBridgeUnsupportedMetadata(
+            const InstanceData::Snapshot& a_snapshot,
+            std::string& a_reason)
+        {
+            if (a_snapshot.customName) {
+                a_reason = "nom personnalise non transporte par Inventory Bridge v1";
+                return true;
+            }
+            if (a_snapshot.ownershipFormID || a_snapshot.ownershipRank) {
+                a_reason = "ownership/rank non transporte par Inventory Bridge v1";
+                return true;
+            }
+            if (a_snapshot.cannotWear) {
+                a_reason = "CannotWear non transporte par Inventory Bridge v1";
+                return true;
+            }
+            return false;
+        }
+
+        bool MatchesEffectShape(
+            const InstanceData::EffectSnapshot& a_snapshot,
+            const STRPM::InventoryEffect& a_effect)
+        {
+            return FloatEqual(a_snapshot.magnitude, a_effect.magnitude) &&
+                   a_snapshot.area == static_cast<std::uint32_t>(
+                       std::max(a_effect.area, 0)) &&
+                   a_snapshot.duration == static_cast<std::uint32_t>(
+                       std::max(a_effect.duration, 0)) &&
+                   FloatEqual(a_snapshot.cost, a_effect.rawCost);
+        }
+
+        bool MatchesPortableEntry(
+            const InstanceData::Snapshot& a_snapshot,
+            const STRPM::InventoryEntry& a_entry)
+        {
+            if (a_entry.count <= 0) {
                 return false;
             }
 
-            const auto plan =
-                BuildTransferPlan(a_player, a_line, a_error);
-            if (!a_error.empty()) {
+            if ((a_entry.flags &
+                 (STRPM::kInventoryEntryWorn |
+                  STRPM::kInventoryEntryWornLeft |
+                  STRPM::kInventoryEntryQuestItem)) != 0) {
                 return false;
             }
-            if (!plan.object) {
-                a_error = fmt::format(
-                    "objet introuvable: {}",
-                    a_line.name);
+
+            const auto expectedHealth = a_snapshot.health.value_or(0.0F);
+            const auto expectedCharge = a_snapshot.charge.value_or(0.0F);
+            if (!FloatEqual(expectedHealth, a_entry.extraHealth) ||
+                !FloatEqual(expectedCharge, a_entry.extraCharge)) {
                 return false;
             }
-            if (plan.available <
-                static_cast<std::int32_t>(a_line.quantity)) {
-                a_error = fmt::format(
-                    "instance indisponible pour {} ({} disponible, {} requis)",
-                    a_line.name,
-                    plan.available,
-                    a_line.quantity);
+
+            if (a_snapshot.soulLevel) {
+                if (a_entry.extraSoulLevel !=
+                    static_cast<std::int32_t>(*a_snapshot.soulLevel)) {
+                    return false;
+                }
+            } else if (a_entry.extraSoulLevel != 0) {
                 return false;
             }
+
+            if (a_snapshot.poisonFormID) {
+                if (IsZeroGameId(a_entry.extraPoisonId) ||
+                    a_entry.extraPoisonCount != a_snapshot.poisonCount) {
+                    return false;
+                }
+            } else if (!IsZeroGameId(a_entry.extraPoisonId) ||
+                       a_entry.extraPoisonCount != 0) {
+                return false;
+            }
+
+            if (!a_snapshot.hasEnchantment) {
+                return IsZeroGameId(a_entry.extraEnchantId) &&
+                       a_entry.extraEnchantCharge == 0 &&
+                       a_entry.enchantEffectCount == 0 &&
+                       (a_entry.flags &
+                        (STRPM::kInventoryEntryEnchantIsWeapon |
+                         STRPM::kInventoryEntryEnchantRemoveOnUnequip)) == 0;
+            }
+
+            if (a_entry.extraEnchantCharge !=
+                a_snapshot.enchantmentMaxCharge) {
+                return false;
+            }
+
+            const bool removeOnUnequip =
+                (a_entry.flags &
+                 STRPM::kInventoryEntryEnchantRemoveOnUnequip) != 0;
+            if (removeOnUnequip != a_snapshot.removeOnUnequip) {
+                return false;
+            }
+
+            if (!a_snapshot.dynamicEnchantment) {
+                return !IsZeroGameId(a_entry.extraEnchantId) &&
+                       a_entry.enchantEffectCount == 0;
+            }
+
+            if (a_entry.enchantEffectCount !=
+                    a_snapshot.enchantmentEffects.size() ||
+                a_entry.enchantEffectCount > STRPM::kMaxInventoryEffects) {
+                return false;
+            }
+
+            for (std::size_t i = 0;
+                 i < a_snapshot.enchantmentEffects.size();
+                 ++i) {
+                if (!MatchesEffectShape(
+                        a_snapshot.enchantmentEffects[i],
+                        a_entry.enchantEffects[i])) {
+                    return false;
+                }
+            }
+
             return true;
         }
 
-        bool ValidateGold(
-            RE::PlayerCharacter* a_player,
+        struct PreparedTransfer
+        {
+            STRPM::InventoryEntry entry{};
+            RE::FormID localFormID{ 0 };
+            std::string name;
+        };
+
+        bool PrepareLine(
+            const std::vector<STRPM::InventoryItem>& a_items,
+            const OfferLine& a_line,
+            std::unordered_map<const STRPM::InventoryItem*, std::int32_t>& a_reserved,
+            PreparedTransfer& a_out,
+            std::string& a_error)
+        {
+            const auto snapshot = InstanceData::Decode(a_line.instanceData);
+            if (!snapshot) {
+                a_error = fmt::format(
+                    "etat d'instance invalide pour {}",
+                    a_line.name);
+                return false;
+            }
+
+            std::string unsupportedReason;
+            if (HasBridgeUnsupportedMetadata(*snapshot, unsupportedReason)) {
+                a_error = fmt::format(
+                    "{}: {}",
+                    a_line.name,
+                    unsupportedReason);
+                return false;
+            }
+
+            std::vector<const STRPM::InventoryItem*> candidates;
+            for (const auto& item : a_items) {
+                if (item.localBaseFormID != a_line.formID ||
+                    !MatchesPortableEntry(*snapshot, item.entry)) {
+                    continue;
+                }
+
+                const auto reserved = a_reserved.contains(std::addressof(item)) ?
+                    a_reserved[std::addressof(item)] : 0;
+                if (item.entry.count - reserved >=
+                    static_cast<std::int32_t>(a_line.quantity)) {
+                    candidates.push_back(std::addressof(item));
+                }
+            }
+
+            if (candidates.empty()) {
+                a_error = fmt::format(
+                    "aucune entree STRPM compatible pour {}",
+                    a_line.name);
+                return false;
+            }
+
+            if (candidates.size() > 1) {
+                a_error = fmt::format(
+                    "plusieurs entrees STRPM correspondent a {} ; transfert ambigu",
+                    a_line.name);
+                return false;
+            }
+
+            const auto* selected = candidates.front();
+            a_reserved[selected] +=
+                static_cast<std::int32_t>(a_line.quantity);
+
+            a_out.entry = selected->entry;
+            a_out.entry.count =
+                static_cast<std::int32_t>(a_line.quantity);
+            a_out.localFormID = a_line.formID;
+            a_out.name = a_line.name;
+            return true;
+        }
+
+        bool PrepareGold(
+            const std::vector<STRPM::InventoryItem>& a_items,
             std::uint32_t a_gold,
+            std::unordered_map<const STRPM::InventoryItem*, std::int32_t>& a_reserved,
+            PreparedTransfer& a_out,
             std::string& a_error)
         {
             if (a_gold == 0) {
                 return true;
             }
 
-            auto* gold = LookupObject(kGoldFormID);
-            if (!gold) {
-                a_error = "or introuvable";
+            const STRPM::InventoryItem* selected = nullptr;
+            for (const auto& item : a_items) {
+                if (item.localBaseFormID != kGoldFormID) {
+                    continue;
+                }
+
+                InstanceData::Snapshot plain{};
+                if (!MatchesPortableEntry(plain, item.entry)) {
+                    continue;
+                }
+
+                const auto reserved = a_reserved.contains(std::addressof(item)) ?
+                    a_reserved[std::addressof(item)] : 0;
+                if (item.entry.count - reserved <
+                    static_cast<std::int32_t>(a_gold)) {
+                    continue;
+                }
+
+                if (selected) {
+                    a_error = "plusieurs piles STRPM de septims compatibles";
+                    return false;
+                }
+                selected = std::addressof(item);
+            }
+
+            if (!selected) {
+                a_error = "septims insuffisants ou absents du snapshot STRPM";
                 return false;
             }
 
-            const auto available = GetObjectCount(a_player, gold);
-            if (available < static_cast<std::int32_t>(a_gold)) {
-                a_error = fmt::format(
-                    "or insuffisant ({} disponible, {} requis)",
-                    available,
-                    a_gold);
-                return false;
-            }
+            a_reserved[selected] += static_cast<std::int32_t>(a_gold);
+            a_out.entry = selected->entry;
+            a_out.entry.count = static_cast<std::int32_t>(a_gold);
+            a_out.localFormID = kGoldFormID;
+            a_out.name = "septims";
             return true;
         }
 
-        bool PrepareIncoming(
-            const Offer& a_remoteOffer,
-            std::vector<IncomingStack>& a_out,
+        bool BuildTransferBatch(
+            const STRPM::InventoryInterface* a_inventory,
+            const Offer& a_offer,
+            std::uint32_t a_gold,
+            std::vector<PreparedTransfer>& a_transfers,
             std::string& a_error)
         {
-            for (const auto& line : a_remoteOffer) {
+            std::vector<STRPM::InventoryItem> items;
+            if (!SnapshotLocalInventory(
+                    a_inventory,
+                    items,
+                    a_error)) {
+                return false;
+            }
+
+            std::unordered_map<
+                const STRPM::InventoryItem*,
+                std::int32_t> reserved;
+
+            a_transfers.clear();
+            a_transfers.reserve(
+                a_offer.size() + (a_gold > 0 ? 1u : 0u));
+
+            for (const auto& line : a_offer) {
                 if (line.formID == 0 ||
                     line.quantity == 0 ||
-                    line.name.empty()) {
-                    a_error = "offre distante invalide";
-                    DestroyIncoming(a_out);
+                    line.name.empty() ||
+                    line.instanceData.empty()) {
+                    a_error = "offre locale invalide";
                     return false;
                 }
 
-                auto* object = LookupObject(line.formID);
-                if (!object) {
-                    a_error = fmt::format(
-                        "objet distant introuvable localement: {} ({:08X})",
-                        line.name,
-                        line.formID);
-                    DestroyIncoming(a_out);
+                PreparedTransfer transfer{};
+                if (!PrepareLine(
+                        items,
+                        line,
+                        reserved,
+                        transfer,
+                        a_error)) {
                     return false;
                 }
-
-                const auto snapshot =
-                    InstanceData::Decode(line.instanceData);
-                if (!snapshot) {
-                    a_error = fmt::format(
-                        "etat d'instance invalide pour {}",
-                        line.name);
-                    DestroyIncoming(a_out);
-                    return false;
-                }
-
-                RE::ExtraDataList* extraList = nullptr;
-                if (!InstanceData::IsEmpty(*snapshot)) {
-                    extraList =
-                        InstanceData::Rebuild(
-                            object,
-                            *snapshot,
-                            a_error);
-                    if (!extraList) {
-                        a_error = fmt::format(
-                            "{}: {}",
-                            line.name,
-                            a_error);
-                        DestroyIncoming(a_out);
-                        return false;
-                    }
-                }
-
-                a_out.push_back(IncomingStack{
-                    object,
-                    extraList,
-                    static_cast<std::int32_t>(line.quantity),
-                    line.name,
-                    line.formID
-                });
+                a_transfers.push_back(std::move(transfer));
             }
+
+            if (a_gold > 0) {
+                PreparedTransfer gold{};
+                if (!PrepareGold(
+                        items,
+                        a_gold,
+                        reserved,
+                        gold,
+                        a_error)) {
+                    return false;
+                }
+                a_transfers.push_back(std::move(gold));
+            }
+
             return true;
         }
     }
@@ -265,153 +473,97 @@ namespace TradeTogether::AutoTransfer
             return false;
         }
 
-        for (const auto& line : a_offer) {
-            if (!ValidateLine(a_player, line, a_error)) {
-                return false;
-            }
+        const auto* inventory = GetInventoryInterface(a_error);
+        if (!inventory) {
+            return false;
         }
-        return ValidateGold(a_player, a_gold, a_error);
+
+        std::vector<PreparedTransfer> transfers;
+        return BuildTransferBatch(
+            inventory,
+            a_offer,
+            a_gold,
+            transfers,
+            a_error);
     }
 
     bool ExecuteLocalExchange(
         RE::PlayerCharacter* a_player,
         const Offer& a_localOffer,
-        const Offer& a_remoteOffer,
+        const Offer&,
         std::uint32_t a_localGold,
-        std::uint32_t a_remoteGold,
+        std::uint32_t,
         std::string& a_error)
     {
-        if (!ValidateLocalOffer(
-                a_player,
-                a_localOffer,
-                a_localGold,
-                a_error)) {
-            return false;
-        }
-
+        a_error.clear();
         if (!a_player) {
             a_error = "joueur local indisponible";
             return false;
         }
 
-        auto* gold = LookupObject(kGoldFormID);
-        if ((a_localGold > 0 || a_remoteGold > 0) && !gold) {
-            a_error = "or introuvable pendant le transfert";
+        if (a_localOffer.empty() && a_localGold == 0) {
+            return true;
+        }
+
+        const auto* inventory = GetInventoryInterface(a_error);
+        if (!inventory) {
             return false;
         }
 
-        // Build every incoming ExtraDataList before debiting anything. A missing
-        // mod form, MagicEffect, poison, owner or other reconstruction problem
-        // therefore aborts the exchange without consuming the local offer.
-        std::vector<IncomingStack> incoming;
-        if (!PrepareIncoming(a_remoteOffer, incoming, a_error)) {
+        std::vector<PreparedTransfer> transfers;
+        if (!BuildTransferBatch(
+                inventory,
+                a_localOffer,
+                a_localGold,
+                transfers,
+                a_error)) {
             return false;
         }
 
-        for (const auto& line : a_localOffer) {
-            auto plan = BuildTransferPlan(
-                a_player,
-                line,
-                a_error);
-            if (!a_error.empty()) {
-                DestroyIncoming(incoming);
-                return false;
-            }
+        const auto peerName =
+            UdpTransport::GetSingleton().GetMostRecentPeerName();
+        if (!peerName || peerName->empty()) {
+            a_error = "partenaire STR introuvable";
+            return false;
+        }
 
-            auto remaining =
-                static_cast<std::int32_t>(line.quantity);
+        const auto peerConnection =
+            UdpTransport::GetSingleton().ResolvePlayerConnectionID(
+                *peerName);
+        if (!peerConnection || *peerConnection == 0) {
+            a_error = "ConnectionID STR du partenaire introuvable";
+            return false;
+        }
 
-            for (const auto& stack : plan.stacks) {
-                if (remaining <= 0) {
-                    break;
-                }
-
-                const auto count =
-                    std::min(remaining, stack.count);
-                a_player->RemoveItem(
-                    plan.object,
-                    count,
-                    RE::ITEM_REMOVE_REASON::kRemove,
-                    stack.extraList,
-                    nullptr);
-                remaining -= count;
-
-                spdlog::info(
-                    "Local trade debit: form={:08X} name=\"{}\" count={} instance=1",
-                    line.formID,
-                    line.name,
-                    count);
-            }
-
-            if (remaining > 0 && plan.baseCount > 0) {
-                const auto count =
-                    std::min(remaining, plan.baseCount);
-                a_player->RemoveItem(
-                    plan.object,
-                    count,
-                    RE::ITEM_REMOVE_REASON::kRemove,
-                    nullptr,
-                    nullptr);
-                remaining -= count;
-
-                spdlog::info(
-                    "Local trade debit: form={:08X} name=\"{}\" count={} instance=0",
-                    line.formID,
-                    line.name,
-                    count);
-            }
-
-            if (remaining > 0) {
-                DestroyIncoming(incoming);
+        for (const auto& transfer : transfers) {
+            STRPM::InventoryTransferID transferID = 0;
+            const auto result = inventory->transfer(
+                *peerConnection,
+                &transfer.entry,
+                &transferID);
+            if (result != STRPM::Result::kOk ||
+                transferID == 0) {
                 a_error = fmt::format(
-                    "transfert incomplet pour {} ({} restant)",
-                    line.name,
-                    remaining);
+                    "Inventory Bridge refuse {} ({})",
+                    transfer.name,
+                    STRPM::ResultToString(result));
+                spdlog::error(
+                    "STRPM inventory transfer start failed: peer={} form={:08X} name=\"{}\" count={} result={}",
+                    *peerConnection,
+                    transfer.localFormID,
+                    transfer.name,
+                    transfer.entry.count,
+                    STRPM::ResultToString(result));
                 return false;
             }
-        }
-
-        if (a_localGold > 0) {
-            a_player->RemoveItem(
-                gold,
-                static_cast<std::int32_t>(a_localGold),
-                RE::ITEM_REMOVE_REASON::kRemove,
-                nullptr,
-                nullptr);
-            spdlog::info(
-                "Local trade gold debit: amount={}",
-                a_localGold);
-        }
-
-        for (auto& stack : incoming) {
-            a_player->AddObjectToContainer(
-                stack.object,
-                stack.extraList,
-                stack.count,
-                nullptr);
 
             spdlog::info(
-                "Local trade receipt: form={:08X} name=\"{}\" count={} instance={}",
-                stack.formID,
-                stack.name,
-                stack.count,
-                stack.extraList ? 1 : 0);
-
-            // AddObjectToContainer adopts the ExtraDataList as part of the
-            // created inventory stack.
-            stack.extraList = nullptr;
-        }
-        incoming.clear();
-
-        if (a_remoteGold > 0) {
-            a_player->AddObjectToContainer(
-                gold,
-                nullptr,
-                static_cast<std::int32_t>(a_remoteGold),
-                nullptr);
-            spdlog::info(
-                "Local trade gold receipt: amount={}",
-                a_remoteGold);
+                "STRPM inventory transfer started: id={} peer={} form={:08X} name=\"{}\" count={}",
+                transferID,
+                *peerConnection,
+                transfer.localFormID,
+                transfer.name,
+                transfer.entry.count);
         }
 
         return true;
